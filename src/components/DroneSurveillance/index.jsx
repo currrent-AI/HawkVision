@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000/api/drone";
+  `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/drone`;
 
 const ACCEPTED_VIDEO_TYPES =
   "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";

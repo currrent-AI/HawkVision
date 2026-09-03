@@ -13,9 +13,19 @@ const authRoutes = require("./routes/authroutes");
 
 const app = express();
 
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(",").map((s) => s.trim())
+  : ["http://localhost:5173", "http://localhost:3000"];
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
   })
 );

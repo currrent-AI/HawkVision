@@ -15,7 +15,7 @@ import {
   LocateFixed,
 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api/chat/message";
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/chat/message`;
 
 function EmergencyChatbot() {
   const [message, setMessage] = useState("");

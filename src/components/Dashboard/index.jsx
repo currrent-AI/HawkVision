@@ -3,7 +3,7 @@ import StatsCards from "./StatsCards";
 import DisasterMap from "./DisasterMap";
 import RecentAlerts from "./RecentAlerts";
 
-const API_URL = "http://localhost:5000/api/disasters";
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/disasters`;
 
 function Dashboard() {
   const [disasters, setDisasters] = useState([]);

@@ -3,9 +3,13 @@ const fs = require("fs");
 const path = require("path");
 
 const PYTHON_PATH =
+  process.env.PYTHON_PATH ||
   "C:/Users/lenovo/AppData/Local/Programs/Python/Python313/python.exe";
 
-const MODEL_PATH = "C:/Users/lenovo/yolo26n.pt";
+const MODEL_PATH =
+  process.env.VICTIM_MODEL_PATH ||
+  process.env.DRONE_MODEL_PATH ||
+  "C:/Users/lenovo/yolo26n.pt";
 const SCRIPT_PATH = path.join(__dirname, "victimDetection.py");
 
 const TIMEOUT_MS = 300000;

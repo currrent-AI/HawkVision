@@ -9,7 +9,10 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "HawkVision AI disaster response backend",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

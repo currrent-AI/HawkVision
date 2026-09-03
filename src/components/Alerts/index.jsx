@@ -19,7 +19,7 @@ import {
 } from "react";
 
 const API_URL =
-  "http://localhost:5000/api/alerts";
+  `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/alerts`;
 
 function Alerts() {
   const [alerts, setAlerts] = useState([]);

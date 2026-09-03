@@ -17,9 +17,8 @@ const startServer = async () => {
 
     await connectDB();
 
-    app.listen(PORT, () => {
-      console.log(`🚀 HawkVision Backend running on port ${PORT}`);
-      console.log(`🌐 http://localhost:${PORT}`);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`HawkVision Backend running on port ${PORT}`);
     });
   } catch (error) {
     console.error("❌ Server startup failed:", error.message);
