@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  background: #080D1A;
+  color: #F8FAFC;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.leaflet-container {
+  background: #080F1E;
+  font-family: inherit;
+}
+
+.leaflet-control-zoom a {
+  background: #111C31 !important;
+  color: #F1F5F9 !important;
+  border-color: #1D304D !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #16233A !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(8, 15, 30, 0.85) !important;
+  color: #64748B !important;
+}
+
+.leaflet-control-attribution a {
+  color: #8FA4C7 !important;
+}
+
+@keyframes hv-scan {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes hv-radar {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+@keyframes hv-fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hv-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.hv-fade-up {
+  animation: hv-fade-up 0.7s ease-out both;
+}
+
+.hv-fade-up-delay-1 { animation-delay: 0.15s; }
+.hv-fade-up-delay-2 { animation-delay: 0.3s; }
+.hv-fade-up-delay-3 { animation-delay: 0.45s; }
+.hv-fade-up-delay-4 { animation-delay: 0.6s; }

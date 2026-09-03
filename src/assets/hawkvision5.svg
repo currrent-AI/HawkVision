@@ -1,0 +1,126 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#DC2626"/><stop offset="100%" stop-color="#6B1414"/>
+  </linearGradient>
+  <linearGradient id="lightGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#FFFFFF"/><stop offset="100%" stop-color="#C9CDD3"/>
+  </linearGradient>
+  <linearGradient id="darkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#232E45"/><stop offset="100%" stop-color="#0A0D13"/>
+  </linearGradient>
+  <radialGradient id="eyeGrad" cx="35%" cy="35%" r="70%">
+    <stop offset="0%" stop-color="#FF8A8A"/><stop offset="55%" stop-color="#E11D1D"/><stop offset="100%" stop-color="#7F1D1D"/>
+  </radialGradient>
+  <linearGradient id="tileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="#EF4444"/><stop offset="100%" stop-color="#8B1616"/>
+  </linearGradient>
+  <linearGradient id="wmRed" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#EF4444"/><stop offset="100%" stop-color="#9F1D1D"/>
+  </linearGradient>
+  <filter id="softShadow" x="-40%" y="-40%" width="180%" height="180%">
+    <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.35"/>
+  </filter>
+
+  <symbol id="hawkColor" viewBox="0 0 240 260">
+    <path id="shieldPath" d="M120,10 L165,18 L195,45 L195,115 L120,225 L45,115 L45,45 L75,18 Z"
+          fill="url(#shieldGrad)" stroke="#FCA5A5" stroke-width="2.5"/>
+    <clipPath id="shieldClip"><path d="M120,10 L165,18 L195,45 L195,115 L120,225 L45,115 L45,45 L75,18 Z"/></clipPath>
+    <g clip-path="url(#shieldClip)">
+      <path d="M38,18 L172,8 L202,68 L160,92 L128,70 L88,112 L48,90 L28,58 Z" fill="url(#lightGrad)"/>
+      <path d="M128,70 L202,68 L212,140 L120,232 L58,150 L88,112 Z" fill="url(#darkGrad)"/>
+      <path d="M52,76 L176,44 L186,70 L64,102 Z" fill="#0A0D13"/>
+      <circle cx="95" cy="90" r="21" fill="#EF4444" opacity="0.22"/>
+      <circle cx="95" cy="90" r="13" fill="url(#eyeGrad)"/>
+      <circle cx="99" cy="86" r="3.5" fill="#FFE8E8" opacity="0.85"/>
+    </g>
+  </symbol>
+
+  <symbol id="hawkMono" viewBox="0 0 240 260">
+    <path d="M120,10 L165,18 L195,45 L195,115 L120,225 L45,115 L45,45 L75,18 Z" fill="none" stroke="#EF4444" stroke-width="3.5"/>
+    <path d="M55,80 L175,50" stroke="#EF4444" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="95" cy="92" r="11" fill="none" stroke="#EF4444" stroke-width="3.5"/>
+    <path d="M92,112 C112,124 138,150 118,205" stroke="#EF4444" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  </symbol>
+
+  <style>
+    .wm-dark  { font-family:'Space Grotesk', Arial, sans-serif; font-weight:700; font-style:italic; fill:#0F1B2E; }
+    .wm-red   { font-family:'Space Grotesk', Arial, sans-serif; font-weight:700; font-style:italic; fill:url(#wmRed); }
+    .wm-red-solid { font-family:'Space Grotesk', Arial, sans-serif; font-weight:700; font-style:italic; fill:#EF4444; }
+    .wm-white { font-family:'Space Grotesk', Arial, sans-serif; font-weight:700; font-style:italic; fill:#F3F1EC; }
+    .tag      { font-family:'Inter', Arial, sans-serif; font-weight:600; fill:#5B6579; letter-spacing:5px; }
+    .tag-lt   { font-family:'Inter', Arial, sans-serif; font-weight:500; fill:#8592AC; letter-spacing:4px; }
+    .feat     { font-family:'Inter', Arial, sans-serif; font-weight:600; fill:#3A4356; letter-spacing:1.5px; font-size:16px; }
+    .panel-lbl{ font-family:'Inter', Arial, sans-serif; font-weight:500; fill:#5B6579; letter-spacing:2px; font-size:11px; }
+  </style>
+</defs>
+
+<!-- ===================== TOP SECTION ===================== -->
+<rect x="0" y="0" width="1200" height="460" fill="#FFFFFF"/>
+
+<rect x="70" y="60" width="320" height="320" rx="58" fill="url(#tileGrad)" filter="url(#softShadow)"/>
+<use href="#hawkColor" x="0" y="0" width="240" height="260" transform="translate(110,90)"/>
+
+<text x="470" y="185" font-size="88" class="wm-dark">Hawk<tspan class="wm-red">Vision</tspan></text>
+<line x1="472" y1="215" x2="522" y2="215" stroke="#EF4444" stroke-width="3"/>
+<text x="536" y="222" font-size="22" class="tag">AI DISASTER RESPONSE</text>
+<line x1="960" y1="215" x2="1010" y2="215" stroke="#EF4444" stroke-width="3"/>
+
+<g transform="translate(472,280)">
+  <circle cx="10" cy="0" r="9" fill="none" stroke="#EF4444" stroke-width="2.5"/>
+  <line x1="10" y1="-14" x2="10" y2="-9" stroke="#EF4444" stroke-width="2.5"/>
+  <line x1="10" y1="9" x2="10" y2="14" stroke="#EF4444" stroke-width="2.5"/>
+  <line x1="-4" y1="0" x2="1" y2="0" stroke="#EF4444" stroke-width="2.5"/>
+  <line x1="19" y1="0" x2="24" y2="0" stroke="#EF4444" stroke-width="2.5"/>
+  <text x="34" y="6" class="feat">DETECT</text>
+
+  <line x1="180" y1="-14" x2="180" y2="14" stroke="#E2E2E2" stroke-width="1.5"/>
+
+  <path d="M215,-10 L230,-14 L245,-10 L245,4 C245,12 238,17 230,20 C222,17 215,12 215,4 Z" fill="none" stroke="#5B6579" stroke-width="2.2"/>
+  <text x="258" y="6" class="feat">ANALYZE</text>
+
+  <line x1="410" y1="-14" x2="410" y2="14" stroke="#E2E2E2" stroke-width="1.5"/>
+
+  <circle cx="450" cy="0" r="10" fill="none" stroke="#EF4444" stroke-width="2.5"/>
+  <circle cx="450" cy="0" r="4" fill="none" stroke="#EF4444" stroke-width="2"/>
+  <text x="470" y="6" class="feat">RESPOND</text>
+</g>
+
+<!-- ===================== BOTTOM VARIATION PANELS ===================== -->
+<rect x="0" y="470" width="300" height="430" fill="#10131A"/>
+<rect x="300" y="470" width="300" height="430" fill="#0D1420"/>
+<rect x="600" y="470" width="300" height="430" fill="#12151C"/>
+<rect x="900" y="470" width="300" height="430" fill="#191C24"/>
+
+<!-- Panel 1: color mark + wordmark -->
+<use href="#hawkColor" x="0" y="0" width="150" height="163" transform="translate(75,540)"/>
+<text x="150" y="760" text-anchor="middle" font-size="34" class="wm-white">Hawk<tspan class="wm-red-solid">Vision</tspan></text>
+<text x="150" y="785" text-anchor="middle" font-size="12" class="tag-lt">AI DISASTER RESPONSE</text>
+<line x1="118" y1="795" x2="182" y2="795" stroke="#EF4444" stroke-width="2"/>
+<text x="150" y="880" text-anchor="middle" class="panel-lbl">FULL LOCKUP — DARK</text>
+
+<!-- Panel 2: crosshair / detect icon -->
+<g transform="translate(450,660)">
+  <circle r="95" fill="none" stroke="#3A2020" stroke-width="1.5"/>
+  <circle r="70" fill="none" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.7"/>
+  <line x1="-105" y1="0" x2="-78" y2="0" stroke="#EF4444" stroke-width="2"/>
+  <line x1="78" y1="0" x2="105" y2="0" stroke="#EF4444" stroke-width="2"/>
+  <line x1="0" y1="-105" x2="0" y2="-78" stroke="#EF4444" stroke-width="2"/>
+  <line x1="0" y1="78" x2="0" y2="105" stroke="#EF4444" stroke-width="2"/>
+  <use href="#hawkColor" x="0" y="0" width="105" height="114" transform="translate(-52,-57)"/>
+</g>
+<text x="450" y="880" text-anchor="middle" class="panel-lbl">DETECT ICON — ISOLATED</text>
+
+<!-- Panel 3: monochrome outline -->
+<use href="#hawkMono" x="0" y="0" width="150" height="163" transform="translate(675,540)"/>
+<text x="750" y="760" text-anchor="middle" font-size="34" class="wm-white">Hawk<tspan class="wm-red-solid">Vision</tspan></text>
+<text x="750" y="785" text-anchor="middle" font-size="12" class="tag-lt">AI DISASTER RESPONSE</text>
+<line x1="718" y1="795" x2="782" y2="795" stroke="#EF4444" stroke-width="2"/>
+<text x="750" y="880" text-anchor="middle" class="panel-lbl">MONOCHROME — SINGLE COLOR USE</text>
+
+<!-- Panel 4: dark app icon tile -->
+<rect x="975" y="600" width="150" height="150" rx="32" fill="#0A0D13" stroke="#2A3040" stroke-width="1.5"/>
+<use href="#hawkColor" x="0" y="0" width="105" height="114" transform="translate(998,619)"/>
+<text x="1050" y="880" text-anchor="middle" class="panel-lbl">APP ICON — DARK TILE</text>
+
+</svg>

@@ -1,0 +1,53 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Build output
+build/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime user uploads (directories are re-created by the server on boot)
+server/uploads/
+
+# YOLO inference output artifacts
+server/runs/
+
+# Unused model weight downloaded during local testing (code uses server/yolo26m.pt)
+/yolov8n.pt
+
+# Stray empty files created by mis-typed shell commands — safe to delete
+167)
+server/100
+server/200
+server/{
