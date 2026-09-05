@@ -4,23 +4,30 @@ const path = require("path");
 
 const PYTHON_PATH =
   process.env.PYTHON_PATH ||
-  "C:/Users/lenovo/AppData/Local/Programs/Python/Python313/python.exe";
+  (process.platform === "win32" ? "python" : "python3");
 
 const MODEL_PATH =
   process.env.VICTIM_MODEL_PATH ||
   process.env.DRONE_MODEL_PATH ||
-  "C:/Users/lenovo/yolo26n.pt";
+  path.resolve(__dirname, "../yolo26m.pt");
+
 const SCRIPT_PATH = path.join(__dirname, "victimDetection.py");
 
 const TIMEOUT_MS = 300000;
 
 function runPythonDetection(imagePath) {
   return new Promise((resolve, reject) => {
-    const child = spawn(PYTHON_PATH, [
-      SCRIPT_PATH,
-      MODEL_PATH,
-      imagePath,
-    ]);
+    const child = spawn(
+      PYTHON_PATH,
+      [
+        SCRIPT_PATH,
+        MODEL_PATH,
+        imagePath,
+      ],
+      {
+        env: process.env,
+      }
+    );
 
     let stdout = "";
     let stderr = "";
@@ -40,7 +47,12 @@ function runPythonDetection(imagePath) {
 
     child.on("error", (error) => {
       clearTimeout(timeout);
-      reject(error);
+
+      reject(
+        new Error(
+          `Unable to start Python victim detection: ${error.message}`
+        )
+      );
     });
 
     child.on("close", (code) => {
@@ -58,6 +70,7 @@ function runPythonDetection(imagePath) {
         const detail =
           (parsed && parsed.error) ||
           stderr.trim() ||
+          stdout.trim() ||
           "no error output";
 
         return reject(
@@ -70,7 +83,9 @@ function runPythonDetection(imagePath) {
       if (!parsed) {
         return reject(
           new Error(
-            `Failed to parse victim detection output: ${stdout.trim()}`
+            `Failed to parse victim detection output: ${
+              stdout.trim() || "empty output"
+            }`
           )
         );
       }
@@ -95,6 +110,19 @@ async function detectVictims(imagePath) {
 
   if (!fs.statSync(imagePath).isFile()) {
     throw new Error(`Path is not a file: ${imagePath}`);
+  }
+
+  // Validate Python script
+  if (!fs.existsSync(SCRIPT_PATH)) {
+    throw new Error(`Victim detection script not found: ${SCRIPT_PATH}`);
+  }
+
+  // Validate YOLO model
+  if (!fs.existsSync(MODEL_PATH)) {
+    throw new Error(
+      `Victim detection model not found: ${MODEL_PATH}. ` +
+      `Set VICTIM_MODEL_PATH in the Render environment variables.`
+    );
   }
 
   return await runPythonDetection(imagePath);
