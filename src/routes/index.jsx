@@ -1,6 +1,8 @@
 import { Routes, Route } from "react-router-dom";
+
 import Dashboard from "../components/Dashboard";
 import MainLayout from "../layouts/MainLayout/index.jsx";
+
 import VictimDetection from "../components/VictimDetection";
 import FloodPrediction from "../components/FloodPrediction";
 import ShelterFinder from "../components/ShelterFinder";
@@ -8,17 +10,43 @@ import EmergencyChatbot from "../components/EmergencyChatbot";
 import Alerts from "../components/Alerts/index.jsx";
 import SOS from "../components/SOS/index.jsx";
 import DroneSurveillance from "../components/DroneSurveillance";
+
 import Landing from "../pages/Landing";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
+
+// NEW
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+
 import ProtectedRoute from "../components/ProtectedRoute";
 
 function AppRoutes() {
   return (
     <Routes>
+
+      {/* ================= PUBLIC ROUTES ================= */}
+
       <Route path="/" element={<Landing />} />
+
       <Route path="/login" element={<Login />} />
+
       <Route path="/signup" element={<Signup />} />
+
+      {/* Forgot Password */}
+      <Route
+        path="/forgot-password"
+        element={<ForgotPassword />}
+      />
+
+      {/* Reset Password */}
+      <Route
+        path="/reset-password/:token"
+        element={<ResetPassword />}
+      />
+
+
+      {/* ================= PROTECTED ROUTES ================= */}
 
       <Route
         path="/dashboard"
@@ -107,6 +135,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
     </Routes>
   );
 }

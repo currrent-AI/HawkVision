@@ -1,52 +1,128 @@
 const Alert = require("../models/alert");
 
-// Convert a Disaster record into an alert format
+const normalizeSosStatus = (status) => {
+  switch (status) {
+    case "Acknowledged":
+      return "ACKNOWLEDGED";
+
+    case "Resolved":
+    case "Cancelled":
+      return "RESOLVED";
+
+    case "Active":
+    default:
+      return "ACTIVE";
+  }
+};
+
+const normalizeSosSeverity = (priority) => {
+  switch (priority) {
+    case "Critical":
+      return "CRITICAL";
+
+    case "High":
+      return "HIGH";
+
+    case "Medium":
+      return "MEDIUM";
+
+    default:
+      return "HIGH";
+  }
+};
+
 const buildDisasterAlert = (disaster) => ({
   id: disaster._id,
-  type: `${disaster.type} Disaster`,
-  title: disaster.description || `${disaster.type} Incident`,
+
+  type: disaster.type || "Disaster",
+
+  title:
+    disaster.description ||
+    `${disaster.type || "Disaster"} Incident`,
+
   message:
     disaster.description ||
-    `${disaster.severity} ${disaster.type} emergency reported at ${disaster.location}.`,
-  severity: disaster.severity,
-  location: disaster.location,
-  status: disaster.status,
-  latitude: disaster.latitude,
-  longitude: disaster.longitude,
+    `${disaster.severity || "UNKNOWN"} ${
+      disaster.type || "Disaster"
+    } emergency reported at ${
+      disaster.location || "Unknown location"
+    }.`,
+
+  severity: disaster.severity || "MEDIUM",
+
+  location: disaster.location || "",
+
+  status: disaster.status || "ACTIVE",
+
+  latitude:
+    disaster.latitude !== undefined
+      ? disaster.latitude
+      : null,
+
+  longitude:
+    disaster.longitude !== undefined
+      ? disaster.longitude
+      : null,
+
   createdAt: disaster.createdAt,
+
   source: "Disaster",
+
+  isManaged: false,
 });
 
-// Convert an SOS record into an alert format
 const buildSosAlert = (sos) => ({
   id: sos._id,
+
   type: "SOS Emergency",
+
   title: sos.notes || "SOS Distress Signal",
+
   message:
     sos.notes ||
-    `${sos.priority} priority SOS distress signal from ${sos.location}.`,
-  severity: sos.priority,
-  location: sos.location,
-  status: sos.status,
-  latitude: sos.latitude,
-  longitude: sos.longitude,
+    `${sos.priority || "HIGH"} priority SOS distress signal from ${
+      sos.location || "Unknown location"
+    }.`,
+
+  severity: normalizeSosSeverity(sos.priority),
+
+  location: sos.location || "",
+
+  status: normalizeSosStatus(sos.status),
+
+  latitude:
+    sos.latitude !== undefined
+      ? sos.latitude
+      : null,
+
+  longitude:
+    sos.longitude !== undefined
+      ? sos.longitude
+      : null,
+
   createdAt: sos.createdAt,
+
   source: "SOS",
+
+  isManaged: true,
 });
 
-// Combine existing Disaster and SOS alerts
-const buildAlerts = (disasters, sosSignals) => {
+const buildAlerts = (
+  disasters = [],
+  sosSignals = []
+) => {
   const alerts = [
     ...disasters.map(buildDisasterAlert),
     ...sosSignals.map(buildSosAlert),
   ];
 
   return alerts.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    (a, b) =>
+      new Date(b.createdAt) -
+      new Date(a.createdAt)
   );
 };
 
-// Create a real alert document in MongoDB
 const createAlert = async ({
   type,
   title,

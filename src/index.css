@@ -43,6 +43,27 @@ body {
   color: #8FA4C7 !important;
 }
 
+.hv-shelter-marker,
+.hv-user-location-marker {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.hv-shelter-popup .leaflet-popup-content-wrapper,
+.hv-shelter-popup .leaflet-popup-tip {
+  background: #111C31;
+  border: 1px solid #1D304D;
+  color: #F1F5F9;
+}
+
+.hv-shelter-popup .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+}
+
+.hv-shelter-popup .leaflet-popup-content {
+  margin: 10px;
+}
+
 @keyframes hv-scan {
   0% { transform: translateY(-100%); opacity: 0; }
   10% { opacity: 1; }

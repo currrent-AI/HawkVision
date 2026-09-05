@@ -10,109 +10,241 @@ import {
   Database,
   Sparkles,
   RefreshCw,
+  Radio,
+  Clock3,
 } from "lucide-react";
-import { useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
+
+const LOCATIONS = [
+  "Lahore",
+  "Swat",
+  "Islamabad",
+  "Rawalpindi",
+  "Murree",
+  "Peshawar",
+  "Karachi",
+];
+
+const EMPTY_ENVIRONMENT = {
+  rainfall: null,
+  waterLevel: null,
+  temperature: null,
+  humidity: null,
+  weatherCondition: null,
+  dataSource: null,
+  weatherSource: null,
+  waterLevelSource: null,
+  rainfallPeriod: null,
+  timestamp: null,
+};
+
+const EMPTY_PREDICTION = {
+  risk: "",
+  percentage: 0,
+  recommendation: "",
+};
 
 function FloodPrediction() {
+  const API_BASE =
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:5000";
+
   const [location, setLocation] = useState("Lahore");
 
-  const [environment, setEnvironment] = useState({
-    rainfall: null,
-    waterLevel: null,
-    temperature: null,
-    humidity: null,
-    weatherCondition: null,
-    dataSource: null,
-    weatherSource: null,
-    waterLevelSource: null,
-    timestamp: null,
-  });
+  const [environment, setEnvironment] = useState(
+    EMPTY_ENVIRONMENT
+  );
 
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
-  const [error, setError] = useState("");
+  const [prediction, setPrediction] = useState(
+    EMPTY_PREDICTION
+  );
+
   const [aiAlert, setAiAlert] = useState(null);
 
-  const [prediction, setPrediction] = useState({
-    risk: "",
-    percentage: 0,
-    recommendation: "",
-  });
+  const [loading, setLoading] = useState(true);
 
-  const handleAnalyze = async () => {
-    setAnalyzing(true);
-    setAnalyzed(false);
-    setError("");
-    setAiAlert(null);
+  const [refreshing, setRefreshing] =
+    useState(false);
 
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/flood/predict`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            location,
-          }),
-        }
-      );
+  const [error, setError] = useState("");
 
-      const result = await response.json();
+  const [lastUpdated, setLastUpdated] =
+    useState(null);
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.error ||
-            result.message ||
-            "Flood analysis failed"
-        );
+  /*
+   * ---------------------------------------------------------
+   * FETCH CURRENT FLOOD DATA
+   * ---------------------------------------------------------
+   *
+   * The backend automatically gets:
+   * - OpenWeather rainfall
+   * - temperature
+   * - humidity
+   * - weather condition
+   * - environmental water level
+   * - calculated flood risk
+   *
+   * HIGH / CRITICAL events are handled by the
+   * existing backend + Groq + MongoDB pipeline.
+   */
+
+  const fetchFloodData = useCallback(
+    async (selectedLocation, isManualRefresh = false) => {
+      if (isManualRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
 
-      const data = result.data;
+      setError("");
 
-      setEnvironment({
-        rainfall: data.rainfall ?? null,
-        waterLevel: data.waterLevel ?? null,
-        temperature: data.temperature ?? null,
-        humidity: data.humidity ?? null,
-        weatherCondition:
-          data.weatherCondition ?? null,
-        dataSource:
-          data.dataSource ?? data.source ?? null,
-        weatherSource:
-          data.weatherSource ?? null,
-        waterLevelSource:
-          data.waterLevelSource ?? null,
-        timestamp: data.timestamp ?? null,
-      });
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/flood/predict`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              location: selectedLocation,
+            }),
+          }
+        );
 
-      setPrediction({
-        risk: data.risk,
-        percentage: data.percentage,
-        recommendation: data.recommendation,
-      });
+        const result = await response.json();
 
-      setAiAlert(data.aiAlert || null);
+        if (
+          !response.ok ||
+          !result.success
+        ) {
+          throw new Error(
+            result.error ||
+              result.message ||
+              "Unable to load flood monitoring data."
+          );
+        }
 
-      setAnalyzed(true);
-    } catch (error) {
-      console.error("Flood analysis error:", error);
+        const data = result.data;
 
-      setError(
-        error.message ||
-          "Unable to complete flood analysis."
-      );
-    } finally {
-      setAnalyzing(false);
-    }
-  };
+        setEnvironment({
+          rainfall:
+            data.rainfall ?? null,
+
+          waterLevel:
+            data.waterLevel ?? null,
+
+          temperature:
+            data.temperature ?? null,
+
+          humidity:
+            data.humidity ?? null,
+
+          weatherCondition:
+            data.weatherCondition ?? null,
+
+          dataSource:
+            data.dataSource ??
+            data.source ??
+            null,
+
+          weatherSource:
+            data.weatherSource ?? null,
+
+          waterLevelSource:
+            data.waterLevelSource ?? null,
+
+          rainfallPeriod:
+            data.rainfallPeriod ?? null,
+
+          timestamp:
+            data.timestamp ?? null,
+        });
+
+        setPrediction({
+          risk: data.risk ?? "",
+          percentage:
+            data.percentage ?? 0,
+
+          recommendation:
+            data.recommendation ?? "",
+        });
+
+        setAiAlert(
+          data.aiAlert || null
+        );
+
+        setLastUpdated(
+          data.timestamp || new Date()
+        );
+      } catch (fetchError) {
+        console.error(
+          "Flood monitoring UI error:",
+          fetchError
+        );
+
+        setError(
+          fetchError.message ||
+            "Unable to load flood monitoring data."
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [API_BASE]
+  );
+
+  /*
+   * ---------------------------------------------------------
+   * AUTOMATIC INITIAL LOAD
+   * ---------------------------------------------------------
+   */
+
+  useEffect(() => {
+    fetchFloodData(location);
+  }, [location, fetchFloodData]);
+
+  /*
+   * ---------------------------------------------------------
+   * AUTOMATIC 10-MINUTE REFRESH
+   * ---------------------------------------------------------
+   *
+   * This only refreshes the selected location's display.
+   *
+   * The actual national monitoring + alert generation
+   * is already running on the backend.
+   */
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchFloodData(location);
+    }, 10 * 60 * 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [location, fetchFloodData]);
+
+  /*
+   * ---------------------------------------------------------
+   * RISK HELPERS
+   * ---------------------------------------------------------
+   */
 
   const getRiskColor = () => {
-    if (prediction.risk === "LOW") return "#22C55E";
-    if (prediction.risk === "MODERATE") return "#3B82F6";
-    if (prediction.risk === "HIGH") return "#F59E0B";
-    if (prediction.risk === "CRITICAL") return "#EF3340";
+    if (prediction.risk === "LOW")
+      return "#22C55E";
+
+    if (prediction.risk === "MODERATE")
+      return "#3B82F6";
+
+    if (prediction.risk === "HIGH")
+      return "#F59E0B";
+
+    if (prediction.risk === "CRITICAL")
+      return "#EF3340";
 
     return "#64748B";
   };
@@ -165,19 +297,28 @@ function FloodPrediction() {
     return "Flood conditions";
   };
 
+  /*
+   * ---------------------------------------------------------
+   * RENDER
+   * ---------------------------------------------------------
+   */
+
   return (
     <div className="space-y-6">
 
       {/* HEADER */}
       <div>
         <div className="flex items-center gap-2">
+
           <p className="text-xs font-semibold tracking-wider text-[#3B82F6]">
             AI FLOOD PREDICTION
           </p>
 
-          <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20">
-            LIVE DATA
+          <span className="px-2 py-1 rounded-full text-[9px] font-bold bg-[#22C55E]/10 text-[#22C55E] border border-[#22C55E]/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+            LIVE MONITORING
           </span>
+
         </div>
 
         <h1 className="text-3xl font-bold text-[#F1F5F9] mt-2">
@@ -185,10 +326,66 @@ function FloodPrediction() {
         </h1>
 
         <p className="text-sm text-[#8FA4C7] mt-2">
-          Analyze environmental conditions and estimate
-          flood risk.
+          HawkVision automatically monitors environmental
+          conditions and detects flood risk.
         </p>
       </div>
+
+
+      {/* AUTOMATIC MONITORING STATUS */}
+      <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl px-5 py-4">
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-10 h-10 rounded-xl bg-[#22C55E]/10 flex items-center justify-center">
+              <Radio
+                size={19}
+                className="text-[#22C55E]"
+              />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-[#F1F5F9]">
+                Automatic Flood Monitoring Active
+              </p>
+
+              <p className="text-xs text-[#64748B] mt-1">
+                Monitoring 7 locations across Pakistan
+              </p>
+            </div>
+
+          </div>
+
+
+          <div className="flex items-center gap-5">
+
+            <div className="flex items-center gap-2 text-xs text-[#8FA4C7]">
+              <Clock3
+                size={14}
+                className="text-[#3B82F6]"
+              />
+
+              <span>
+                Auto refresh:{" "}
+                <span className="text-[#F1F5F9]">
+                  10 min
+                </span>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-[#22C55E]">
+              <span className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse" />
+              System Active
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
 
       {/* MAIN GRID */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -197,32 +394,43 @@ function FloodPrediction() {
         <div className="xl:col-span-2 bg-[#111C31] border border-[#1D304D] rounded-2xl p-6">
 
           {/* CARD HEADER */}
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center justify-between mb-6">
 
-            <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center">
-              <Waves
-                size={20}
-                className="text-[#3B82F6]"
-              />
+            <div className="flex items-center gap-3">
+
+              <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center">
+                <Waves
+                  size={20}
+                  className="text-[#3B82F6]"
+                />
+              </div>
+
+              <div>
+                <h2 className="font-semibold text-[#F1F5F9]">
+                  Environmental Conditions
+                </h2>
+
+                <p className="text-xs text-[#64748B]">
+                  Automatically collected live data
+                </p>
+              </div>
+
             </div>
 
-            <div>
-              <h2 className="font-semibold text-[#F1F5F9]">
-                Environmental Conditions
-              </h2>
 
-              <p className="text-xs text-[#64748B]">
-                Automatic environmental data
-              </p>
+            <div className="flex items-center gap-2 text-[10px] text-[#22C55E]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+              LIVE
             </div>
 
           </div>
+
 
           {/* LOCATION */}
           <div className="mb-6">
 
             <label className="text-sm text-[#8FA4C7]">
-              Location
+              Monitoring Location
             </label>
 
             <div className="relative mt-2">
@@ -236,35 +444,29 @@ function FloodPrediction() {
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value);
-                  setAnalyzed(false);
-                  setError("");
                   setAiAlert(null);
-
-                  setEnvironment({
-                    rainfall: null,
-                    waterLevel: null,
-                    temperature: null,
-                    humidity: null,
-                    weatherCondition: null,
-                    dataSource: null,
-                    weatherSource: null,
-                    waterLevelSource: null,
-                    timestamp: null,
-                  });
                 }}
                 className="w-full h-11 rounded-xl bg-[#080F1E] border border-[#1D304D] pl-10 pr-4 text-sm text-[#F1F5F9] outline-none focus:border-[#3B82F6]"
               >
-                <option>Lahore</option>
-                <option>Swat</option>
-                <option>Islamabad</option>
-                <option>Rawalpindi</option>
-                <option>Murree</option>
-                <option>Peshawar</option>
-                <option>Karachi</option>
+                {LOCATIONS.map((city) => (
+                  <option
+                    key={city}
+                    value={city}
+                  >
+                    {city}
+                  </option>
+                ))}
               </select>
 
             </div>
+
+            <p className="text-[10px] text-[#64748B] mt-2">
+              Select a location to inspect its latest
+              automatically monitored conditions.
+            </p>
+
           </div>
+
 
           {/* AUTOMATIC DATA */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -288,7 +490,9 @@ function FloodPrediction() {
                 </div>
 
                 <span className="text-lg font-semibold text-[#F1F5F9]">
-                  {environment.rainfall !== null
+                  {loading
+                    ? "..."
+                    : environment.rainfall !== null
                     ? `${environment.rainfall} mm`
                     : "--"}
                 </span>
@@ -296,10 +500,12 @@ function FloodPrediction() {
               </div>
 
               <p className="text-xs text-[#64748B] mt-2">
-                OpenWeather
+                {environment.rainfallPeriod ||
+                  "OpenWeather"}
               </p>
 
             </div>
+
 
             {/* WATER LEVEL */}
             <div className="p-4 rounded-xl bg-[#080F1E] border border-[#1D304D]">
@@ -320,7 +526,9 @@ function FloodPrediction() {
                 </div>
 
                 <span className="text-lg font-semibold text-[#F1F5F9]">
-                  {environment.waterLevel !== null
+                  {loading
+                    ? "..."
+                    : environment.waterLevel !== null
                     ? `${environment.waterLevel}%`
                     : "--"}
                 </span>
@@ -333,6 +541,7 @@ function FloodPrediction() {
               </p>
 
             </div>
+
 
             {/* TEMPERATURE */}
             <div className="p-4 rounded-xl bg-[#080F1E] border border-[#1D304D]">
@@ -353,7 +562,9 @@ function FloodPrediction() {
                 </div>
 
                 <span className="text-lg font-semibold text-[#F1F5F9]">
-                  {environment.temperature !== null
+                  {loading
+                    ? "..."
+                    : environment.temperature !== null
                     ? `${environment.temperature}°C`
                     : "--"}
                 </span>
@@ -365,6 +576,7 @@ function FloodPrediction() {
               </p>
 
             </div>
+
 
             {/* HUMIDITY */}
             <div className="p-4 rounded-xl bg-[#080F1E] border border-[#1D304D]">
@@ -385,7 +597,9 @@ function FloodPrediction() {
                 </div>
 
                 <span className="text-lg font-semibold text-[#F1F5F9]">
-                  {environment.humidity !== null
+                  {loading
+                    ? "..."
+                    : environment.humidity !== null
                     ? `${environment.humidity}%`
                     : "--"}
                 </span>
@@ -399,6 +613,7 @@ function FloodPrediction() {
             </div>
 
           </div>
+
 
           {/* WEATHER CONDITION */}
           {environment.weatherCondition && (
@@ -426,23 +641,31 @@ function FloodPrediction() {
             </div>
           )}
 
+
           {/* DATA SOURCES */}
           {environment.dataSource && (
             <div className="mb-5 p-3 rounded-xl bg-[#080F1E] border border-[#1D304D] space-y-2">
 
               <div className="flex items-center gap-2 text-xs text-[#8FA4C7]">
-                <Database size={14} className="text-[#3B82F6]" />
+
+                <Database
+                  size={14}
+                  className="text-[#3B82F6]"
+                />
+
                 <span>
                   Data source:{" "}
                   <span className="text-[#F1F5F9]">
                     {environment.dataSource}
                   </span>
                 </span>
+
               </div>
 
               {environment.weatherSource && (
                 <div className="text-[11px] text-[#64748B] pl-6">
-                  Weather: {environment.weatherSource}
+                  Weather:{" "}
+                  {environment.weatherSource}
                 </div>
               )}
 
@@ -456,6 +679,7 @@ function FloodPrediction() {
             </div>
           )}
 
+
           {/* ERROR */}
           {error && (
             <div className="mb-5 p-4 rounded-xl bg-[#EF3340]/10 border border-[#EF3340]/20 flex gap-3">
@@ -466,50 +690,68 @@ function FloodPrediction() {
               />
 
               <div>
+
                 <p className="text-sm font-medium text-[#F1F5F9]">
-                  Analysis unavailable
+                  Monitoring data unavailable
                 </p>
 
                 <p className="text-xs text-[#8FA4C7] mt-1 leading-relaxed">
                   {error}
                 </p>
+
               </div>
 
             </div>
           )}
 
-          {/* ANALYZE BUTTON */}
+
+          {/* MANUAL REFRESH */}
           <button
-            onClick={handleAnalyze}
-            disabled={analyzing}
+            onClick={() =>
+              fetchFloodData(
+                location,
+                true
+              )
+            }
+            disabled={refreshing || loading}
             className="w-full h-12 rounded-xl bg-[#3B82F6] hover:bg-[#2563EB] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition flex items-center justify-center gap-2"
           >
-            {analyzing ? (
+
+            {refreshing ? (
               <>
                 <RefreshCw
                   size={17}
                   className="animate-spin"
                 />
-                Analyzing Conditions...
+
+                Refreshing Live Data...
               </>
             ) : (
               <>
-                <Sparkles size={17} />
-                Run AI Flood Analysis
+                <RefreshCw size={17} />
+
+                Refresh Selected Location
               </>
             )}
+
           </button>
 
-          {environment.timestamp && !analyzing && (
+
+          {/* LAST UPDATE */}
+          {lastUpdated && !loading && (
             <p className="text-[10px] text-[#64748B] text-center mt-3">
-              Last analysis:{" "}
+
+              Last updated:{" "}
+
               {new Date(
-                environment.timestamp
+                lastUpdated
               ).toLocaleString()}
+
             </p>
           )}
 
         </div>
+
 
         {/* PREDICTION RESULT */}
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-6">
@@ -518,25 +760,43 @@ function FloodPrediction() {
           <div className="flex items-center gap-3 mb-6">
 
             <div className="w-10 h-10 rounded-xl bg-[#F59E0B]/10 flex items-center justify-center">
+
               <TrendingUp
                 size={20}
                 className="text-[#F59E0B]"
               />
+
             </div>
 
             <div>
+
               <h2 className="font-semibold text-[#F1F5F9]">
                 Prediction
               </h2>
 
               <p className="text-xs text-[#64748B]">
-                AI risk assessment
+                Automatic AI risk assessment
               </p>
+
             </div>
 
           </div>
 
-          {!analyzed ? (
+
+          {loading ? (
+            <div className="h-[300px] flex flex-col items-center justify-center text-center">
+
+              <RefreshCw
+                size={35}
+                className="text-[#3B82F6] animate-spin mb-4"
+              />
+
+              <p className="text-sm text-[#8FA4C7]">
+                Loading live flood conditions...
+              </p>
+
+            </div>
+          ) : !prediction.risk ? (
 
             <div className="h-[300px] flex flex-col items-center justify-center text-center">
 
@@ -550,7 +810,7 @@ function FloodPrediction() {
               </p>
 
               <p className="text-xs text-[#64748B] mt-2 max-w-[220px]">
-                Select a location and run AI analysis.
+                Live monitoring data could not be loaded.
               </p>
 
             </div>
@@ -578,10 +838,11 @@ function FloodPrediction() {
                         `${getRiskColor()}18`,
                     }}
                   >
-                    {prediction.risk || "UNKNOWN"}
+                    {prediction.risk}
                   </span>
 
                 </div>
+
 
                 <div className="flex items-end justify-between mt-2">
 
@@ -600,6 +861,7 @@ function FloodPrediction() {
 
                 </div>
 
+
                 {/* PROGRESS */}
                 <div className="mt-4 h-2 rounded-full bg-[#080F1E] overflow-hidden">
 
@@ -610,13 +872,16 @@ function FloodPrediction() {
                         100,
                         prediction.percentage
                       )}%`,
-                      backgroundColor: getRiskColor(),
+
+                      backgroundColor:
+                        getRiskColor(),
                     }}
                   />
 
                 </div>
 
               </div>
+
 
               {/* RECOMMENDATION */}
               <div
@@ -645,23 +910,26 @@ function FloodPrediction() {
 
               </div>
 
+
               {/* AI ALERT */}
               {aiAlert && (
                 <div className="p-4 rounded-xl bg-[#EF3340]/10 border border-[#EF3340]/20">
 
-                  {/* AI HEADER */}
                   <div className="flex items-center justify-between mb-3">
 
                     <div className="flex items-center gap-2">
 
                       <div className="w-8 h-8 rounded-lg bg-[#EF3340]/10 flex items-center justify-center">
+
                         <Sparkles
                           size={16}
                           className="text-[#EF3340]"
                         />
+
                       </div>
 
                       <div>
+
                         <p className="text-sm font-semibold text-[#F1F5F9]">
                           AI Alert Generated
                         </p>
@@ -669,31 +937,34 @@ function FloodPrediction() {
                         <p className="text-[10px] text-[#64748B]">
                           Groq Disaster Intelligence
                         </p>
+
                       </div>
 
                     </div>
 
-                    {/* ACTION */}
+
                     <span
                       className={`text-[10px] font-bold px-2 py-1 rounded-full ${
-                        aiAlert.action === "UPDATED"
+                        aiAlert.action ===
+                        "UPDATED"
                           ? "bg-[#3B82F6]/10 text-[#3B82F6]"
                           : "bg-[#22C55E]/10 text-[#22C55E]"
                       }`}
                     >
-                      {aiAlert.action === "UPDATED"
+                      {aiAlert.action ===
+                      "UPDATED"
                         ? "UPDATED"
                         : "NEW ALERT"}
                     </span>
 
                   </div>
 
-                  {/* TITLE */}
+
                   <p className="text-sm text-[#8FA4C7] leading-relaxed">
                     {aiAlert.title}
                   </p>
 
-                  {/* SEVERITY */}
+
                   <div className="flex items-center justify-between mt-4">
 
                     <span className="text-xs text-[#64748B]">
@@ -718,7 +989,7 @@ function FloodPrediction() {
 
                   </div>
 
-                  {/* CONFIDENCE */}
+
                   {aiAlert.confidence !==
                     undefined && (
                     <div className="flex items-center justify-between mt-2">
@@ -728,23 +999,28 @@ function FloodPrediction() {
                       </span>
 
                       <span className="text-xs font-semibold text-[#F1F5F9]">
+
                         {Math.round(
-                          aiAlert.confidence * 100
+                          aiAlert.confidence *
+                            100
                         )}
                         %
+
                       </span>
 
                     </div>
                   )}
 
-                  {/* ACTION DESCRIPTION */}
+
                   <div className="mt-3 pt-3 border-t border-[#1D304D]">
 
                     <p className="text-[11px] text-[#64748B]">
+
                       {aiAlert.action ===
                       "UPDATED"
                         ? "Existing active alert was updated with the latest analysis."
                         : "A new AI-generated emergency alert was created."}
+
                     </p>
 
                   </div>
@@ -752,10 +1028,10 @@ function FloodPrediction() {
                 </div>
               )}
 
-              {/* CONDITIONS */}
+
+              {/* SELECTED LOCATION SUMMARY */}
               <div className="grid grid-cols-2 gap-3">
 
-                {/* LOCATION */}
                 <div className="p-3 rounded-xl bg-[#080F1E] border border-[#1D304D]">
 
                   <p className="text-xs text-[#64748B]">
@@ -768,7 +1044,7 @@ function FloodPrediction() {
 
                 </div>
 
-                {/* WEATHER */}
+
                 <div className="p-3 rounded-xl bg-[#080F1E] border border-[#1D304D]">
 
                   <p className="text-xs text-[#64748B]">
@@ -782,7 +1058,7 @@ function FloodPrediction() {
 
                 </div>
 
-                {/* RAINFALL */}
+
                 <div className="p-3 rounded-xl bg-[#080F1E] border border-[#1D304D]">
 
                   <p className="text-xs text-[#64748B]">
@@ -790,14 +1066,15 @@ function FloodPrediction() {
                   </p>
 
                   <p className="text-sm font-semibold mt-1 text-[#F1F5F9]">
-                    {environment.rainfall !== null
+                    {environment.rainfall !==
+                    null
                       ? `${environment.rainfall} mm`
                       : "--"}
                   </p>
 
                 </div>
 
-                {/* WATER LEVEL */}
+
                 <div className="p-3 rounded-xl bg-[#080F1E] border border-[#1D304D]">
 
                   <p className="text-xs text-[#64748B]">
@@ -822,6 +1099,7 @@ function FloodPrediction() {
         </div>
 
       </div>
+
     </div>
   );
 }

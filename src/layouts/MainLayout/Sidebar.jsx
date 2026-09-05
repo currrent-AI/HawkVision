@@ -62,41 +62,39 @@ function Sidebar() {
 
   return (
     <aside className="w-64 min-h-screen bg-[#080D1A] border-r border-[#1D304D] px-4 py-5 flex flex-col">
-
       {/* ================= LOGO ================= */}
 
       <div className="mb-7">
-
-        <div className="flex items-center justify-center">
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="w-full flex items-center justify-center cursor-pointer"
+          aria-label="Go to Dashboard"
+          title="HawkVision Dashboard"
+        >
           <img
             src={hawkvision1}
             alt="HawkVision AI"
             className="w-full max-w-[220px] h-auto object-contain"
           />
-        </div>
+        </button>
 
         <div className="flex items-center gap-2 mt-2 px-1">
-
           <span className="w-1.5 h-1.5 rounded-full bg-[#EF3340] shadow-[0_0_7px_rgba(239,51,64,0.7)]" />
 
           <p className="text-xs text-[#8FA4C7] tracking-wide">
             National Operations
           </p>
-
         </div>
-
       </div>
-
 
       {/* ================= NAVIGATION ================= */}
 
       <nav className="space-y-1.5 flex-1">
-
         {menuItems.map((item) => {
-
           const Icon = item.icon;
 
-          const isActive = location.pathname === item.path;
+          const isActive =
+            location.pathname === item.path;
 
           return (
             <button
@@ -121,9 +119,7 @@ function Sidebar() {
                 }
               `}
             >
-
               {/* Active red line */}
-
               {isActive && (
                 <span
                   className="
@@ -156,21 +152,19 @@ function Sidebar() {
               <span className="text-sm font-medium">
                 {item.name}
               </span>
-
             </button>
           );
         })}
-
       </nav>
-
 
       {/* ================= EMERGENCY HOTLINE ================= */}
 
       <div className="mt-6">
-
-        <div
+        <a
+          href="tel:1122"
           className="
             relative
+            block
             overflow-hidden
             rounded-xl
             border
@@ -178,11 +172,15 @@ function Sidebar() {
             bg-[#100D19]
             px-3.5
             py-3.5
+            hover:border-[#EF3340]/60
+            hover:bg-[#160F1C]
+            transition-all
+            cursor-pointer
           "
+          aria-label="Call Emergency Hotline 1122"
+          title="Call Emergency Hotline 1122"
         >
-
-          {/* subtle red glow */}
-
+          {/* Subtle red glow */}
           <div
             className="
               absolute
@@ -197,16 +195,12 @@ function Sidebar() {
           />
 
           {/* Label */}
-
           <p className="relative text-[10px] font-semibold tracking-wide text-[#EF3340] uppercase">
             Emergency Hotline
           </p>
 
-
           {/* Number */}
-
           <div className="relative flex items-center gap-2 mt-2">
-
             <Phone
               size={19}
               className="text-[#EF3340]"
@@ -215,20 +209,14 @@ function Sidebar() {
             <span className="text-xl font-bold text-[#F8FAFC] tracking-wide">
               1122
             </span>
-
           </div>
 
-
           {/* Description */}
-
           <p className="relative text-[9px] text-[#8FA4C7] mt-1">
             National Emergency Number
           </p>
-
-        </div>
-
+        </a>
       </div>
-
     </aside>
   );
 }

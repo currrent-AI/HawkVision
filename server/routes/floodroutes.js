@@ -1,15 +1,19 @@
 const express = require("express");
 const Alert = require("../models/alert");
 
-const { analyzeAlertWithAI } = require("../services/alertAI");
-const { createAlert } = require("../services/alerts");
+const {
+  analyzeAlertWithAI,
+} = require("../services/alertAI");
+
+const {
+  createAlert,
+} = require("../services/alerts");
 
 const {
   getEnvironmentalData,
 } = require("../services/environmentalData");
 
 const router = express.Router();
-
 
 /*
   Flood recommendations
@@ -55,15 +59,16 @@ router.post("/predict", async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-
-        message: "Invalid flood analysis input",
-
-        error: "location is required",
+        message:
+          "Invalid flood analysis input",
+        error:
+          "location is required",
       });
     }
 
 
-    const normalizedLocation = location.trim();
+    const normalizedLocation =
+      location.trim();
 
 
     /*
@@ -95,18 +100,30 @@ router.post("/predict", async (req, res) => {
     /*
       Flood risk calculation
 
-      Rainfall contribution = 55%
-      Water level contribution = 45%
+      Rainfall contribution = 40%
+      Water level contribution = 60%
     */
 
-    const rainfallScore = Math.min(rainfall / 200, 1);
-const waterScore = Math.min(waterLevel / 100, 1);
+    const rainfallScore =
+      Math.min(
+        rainfall / 200,
+        1
+      );
 
-// Flood risk weighting
-// Rainfall = 40%
-// Water Level = 60%
-const riskScore =
-  rainfallScore * 40 + waterScore * 60;
+    const waterScore =
+      Math.min(
+        waterLevel / 100,
+        1
+      );
+
+
+    /*
+      Flood risk weighting
+    */
+
+    const riskScore =
+      rainfallScore * 40 +
+      waterScore * 60;
 
 
     /*
@@ -114,12 +131,10 @@ const riskScore =
     */
 
     let risk;
-
     let percentage;
 
 
     if (riskScore < 30) {
-
       risk = "LOW";
 
       percentage = Math.round(
@@ -127,7 +142,6 @@ const riskScore =
       );
 
     } else if (riskScore < 55) {
-
       risk = "MODERATE";
 
       percentage = Math.round(
@@ -135,7 +149,6 @@ const riskScore =
       );
 
     } else if (riskScore < 75) {
-
       risk = "HIGH";
 
       percentage = Math.round(
@@ -143,7 +156,6 @@ const riskScore =
       );
 
     } else {
-
       risk = "CRITICAL";
 
       percentage = Math.min(
@@ -158,7 +170,6 @@ const riskScore =
     */
 
     const responseData = {
-
       location:
         environmentalData.location,
 
@@ -210,7 +221,6 @@ const riskScore =
       risk === "HIGH" ||
       risk === "CRITICAL"
     ) {
-
       try {
 
         console.log(
@@ -224,7 +234,6 @@ const riskScore =
 
         const aiResult =
           await analyzeAlertWithAI({
-
             type: "flood",
 
             location: {
@@ -256,7 +265,9 @@ const riskScore =
             risk,
 
             riskScore: Number(
-              (riskScore / 100).toFixed(2)
+              (
+                riskScore / 100
+              ).toFixed(2)
             ),
 
             description:
@@ -265,9 +276,7 @@ const riskScore =
 
 
         /*
-          ------------------------------------------------
           ALERT DEDUPLICATION
-          ------------------------------------------------
 
           Check if an ACTIVE flood alert already
           exists for this location.
@@ -281,7 +290,6 @@ const riskScore =
 
         const existingAlert =
           await Alert.findOne({
-
             "location.name":
               environmentalData.location,
 
@@ -307,7 +315,6 @@ const riskScore =
 
           alert =
             await Alert.findByIdAndUpdate(
-
               existingAlert._id,
 
               {
@@ -327,7 +334,6 @@ const riskScore =
                   "Flood Prediction AI + Groq",
 
                 location: {
-
                   name:
                     environmentalData.location,
 
@@ -341,7 +347,6 @@ const riskScore =
                 },
 
                 metadata: {
-
                   rainfall,
 
                   waterLevel,
@@ -385,7 +390,6 @@ const riskScore =
 
               {
                 new: true,
-
                 runValidators: true,
               }
             );
@@ -396,13 +400,8 @@ const riskScore =
           );
 
 
-          /*
-            Tell frontend that this was an update
-          */
-
           responseData.aiAlertAction =
             "UPDATED";
-
         }
 
 
@@ -414,7 +413,6 @@ const riskScore =
 
           alert =
             await createAlert({
-
               type:
                 aiResult.type,
 
@@ -431,7 +429,6 @@ const riskScore =
                 "Flood Prediction AI + Groq",
 
               location: {
-
                 name:
                   environmentalData.location,
 
@@ -445,7 +442,6 @@ const riskScore =
               },
 
               metadata: {
-
                 rainfall,
 
                 waterLevel,
@@ -500,7 +496,6 @@ const riskScore =
         */
 
         responseData.aiAlert = {
-
           id:
             alert._id,
 
@@ -520,6 +515,7 @@ const riskScore =
             responseData.aiAlertAction,
         };
 
+
       } catch (aiError) {
 
         /*
@@ -532,11 +528,10 @@ const riskScore =
           aiError.message
         );
 
-
         responseData.aiAlert = null;
 
-      responseData.aiAlertError =
-  aiError.message;
+        responseData.aiAlertError =
+          aiError.message;
       }
     }
 
@@ -546,7 +541,6 @@ const riskScore =
     */
 
     return res.status(200).json({
-
       success: true,
 
       message:
@@ -556,6 +550,7 @@ const riskScore =
         responseData,
     });
 
+
   } catch (error) {
 
     console.error(
@@ -563,9 +558,7 @@ const riskScore =
       error
     );
 
-
     return res.status(500).json({
-
       success: false,
 
       message:

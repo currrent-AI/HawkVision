@@ -21,15 +21,14 @@ router.get("/", async (req, res) => {
       ]);
 
     // Disaster + SOS alerts are generated from
-    // their own collections, so they are read-only
-    // from this Alerts dashboard.
+    // their own collections.
     const existingAlerts = buildAlerts(
-      disasters,
-      sosSignals
-    ).map((alert) => ({
-      ...alert,
-      isManaged: false,
-    }));
+  disasters,
+  sosSignals
+).map((alert) => ({
+  ...alert,
+  isManaged: alert.source === "SOS",
+}));
 
     // MongoDB Alert documents can be acknowledged/resolved
     const managedAlerts = savedAlerts.map((alert) => ({
@@ -48,8 +47,7 @@ router.get("/", async (req, res) => {
       source: alert.source,
       metadata: alert.metadata,
 
-      // IMPORTANT:
-      // These alerts exist inside Alert collection.
+      // Alerts from Alert collection
       isManaged: true,
     }));
 
@@ -192,13 +190,17 @@ router.post("/ai", async (req, res) => {
 });
 
 // =====================================================
-// PATCH ACKNOWLEDGE ALERT
+// PATCH ACKNOWLEDGE ALERT / SOS
 // =====================================================
 
 router.patch(
   "/:id/acknowledge",
   async (req, res) => {
     try {
+      // -------------------------------------------------
+      // 1. Try normal Alert collection first
+      // -------------------------------------------------
+
       const alert =
         await Alert.findByIdAndUpdate(
           req.params.id,
@@ -212,23 +214,48 @@ router.patch(
           }
         );
 
-      if (!alert) {
+      if (alert) {
+        return res.status(200).json({
+          success: true,
+          message:
+            "Alert acknowledged successfully",
+          data: alert,
+        });
+      }
+
+      // -------------------------------------------------
+      // 2. If not found, try SOS collection
+      // -------------------------------------------------
+
+      const sos =
+        await Sos.findByIdAndUpdate(
+          req.params.id,
+          {
+            status: "Acknowledged",
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+      if (!sos) {
         return res.status(404).json({
           success: false,
           message:
-            "Managed alert not found",
+            "Alert or SOS signal not found",
         });
       }
 
       return res.status(200).json({
         success: true,
         message:
-          "Alert acknowledged successfully",
-        data: alert,
+          "SOS acknowledged successfully",
+        data: sos,
       });
     } catch (error) {
       console.error(
-        "Acknowledge alert error:",
+        "Acknowledge alert/SOS error:",
         error
       );
 
@@ -243,13 +270,17 @@ router.patch(
 );
 
 // =====================================================
-// PATCH RESOLVE ALERT
+// PATCH RESOLVE ALERT / SOS
 // =====================================================
 
 router.patch(
   "/:id/resolve",
   async (req, res) => {
     try {
+      // -------------------------------------------------
+      // 1. Try normal Alert collection first
+      // -------------------------------------------------
+
       const alert =
         await Alert.findByIdAndUpdate(
           req.params.id,
@@ -263,23 +294,48 @@ router.patch(
           }
         );
 
-      if (!alert) {
+      if (alert) {
+        return res.status(200).json({
+          success: true,
+          message:
+            "Alert resolved successfully",
+          data: alert,
+        });
+      }
+
+      // -------------------------------------------------
+      // 2. If not found, try SOS collection
+      // -------------------------------------------------
+
+      const sos =
+        await Sos.findByIdAndUpdate(
+          req.params.id,
+          {
+            status: "Resolved",
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+      if (!sos) {
         return res.status(404).json({
           success: false,
           message:
-            "Managed alert not found",
+            "Alert or SOS signal not found",
         });
       }
 
       return res.status(200).json({
         success: true,
         message:
-          "Alert resolved successfully",
-        data: alert,
+          "SOS resolved successfully",
+        data: sos,
       });
     } catch (error) {
       console.error(
-        "Resolve alert error:",
+        "Resolve alert/SOS error:",
         error
       );
 

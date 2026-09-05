@@ -14,11 +14,15 @@ const sosSchema = new mongoose.Schema(
     },
 
     status: {
-      type: String,
-      enum: ["Active", "Cancelled", "Resolved"],
-      default: "Active",
-    },
-
+  type: String,
+  enum: [
+    "Active",
+    "Acknowledged",
+    "Cancelled",
+    "Resolved",
+  ],
+  default: "Active",
+},
     notes: {
       type: String,
       default: "",

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 const API_URL =
-  `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/api/drone`;
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api/drone";
 
 const ACCEPTED_VIDEO_TYPES =
   "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov";
@@ -358,15 +358,16 @@ function DroneSurveillance() {
               liveFramesRef.current.shift();
             }
 
-            const nextMap = {
-              ...liveTrackMapRef.current,
-            };
+            // Only tracks visible in THIS AI frame are active.
+            // Historical tracks must not stay in the panel forever.
+            const nextMap = {};
+            const currentItems = Array.isArray(data.victims)
+              ? data.victims
+              : [];
 
-            if (Array.isArray(data.victims)) {
-              data.victims.forEach((victim) => {
-                nextMap[victim.id] = victim;
-              });
-            }
+            currentItems.forEach((victim) => {
+              nextMap[victim.id] = victim;
+            });
 
             liveTrackMapRef.current = nextMap;
 
@@ -396,11 +397,8 @@ function DroneSurveillance() {
               liveFramesRef.current.shift();
             }
 
-            const nextMap = {
-              ...liveTrackMapRef.current,
-            };
-
             const items = data.tracks || data.detections || [];
+            const nextMap = {};
 
             items.forEach((track) => {
               nextMap[track.id] = track;
@@ -426,6 +424,12 @@ function DroneSurveillance() {
           // -----------------------------
 
           if (data.type === "complete") {
+            // Analysis ended: remove every stale box immediately.
+            liveFramesRef.current = [];
+            liveTrackMapRef.current = {};
+            setLiveFrames([]);
+            setLiveTrackMap({});
+            setSelectedTrackId(null);
             setAiStatus("complete");
             isStartingRef.current = false;
 
@@ -958,19 +962,33 @@ function DroneSurveillance() {
   const currentDetections = useMemo(() => {
     if (!liveFrames.length) return [];
 
-    // Backend live events use wall-clock timestamps, while the
-    // video player reports playback time from zero. Match on the
-    // latest frame instead of timestamp to keep the overlay in
-    // sync with the running AI pipeline.
-    const latestFrame = liveFrames[liveFrames.length - 1];
+    // Match AI detections to the ACTUAL video playback position.
+    // Never render the newest event merely because it arrived last.
+    const tolerance = 0.75;
+    let bestFrame = null;
+    let bestDifference = Infinity;
+
+    for (const frame of liveFrames) {
+      const timestamp = Number(
+        frame.videoTime ?? frame.timestamp ?? 0
+      );
+      const difference = Math.abs(timestamp - currentTime);
+
+      if (difference < bestDifference) {
+        bestDifference = difference;
+        bestFrame = frame;
+      }
+    }
+
+    if (!bestFrame || bestDifference > tolerance) return [];
 
     const items =
-      latestFrame.detections ||
-      latestFrame.tracks ||
+      bestFrame.detections ||
+      bestFrame.tracks ||
       [];
 
     return items.map(normalizeTrack);
-  }, [liveFrames]);
+  }, [liveFrames, currentTime]);
 
   // ------------------------------------------------------------
   // BATCH DETECTIONS

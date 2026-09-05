@@ -24,13 +24,15 @@ const API_URL =
 function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
+
   const [severityFilter, setSeverityFilter] =
     useState("ALL");
+
+  // Default view = Open Alerts
   const [statusFilter, setStatusFilter] =
     useState("ALL");
 
@@ -55,10 +57,7 @@ function Alerts() {
         const response = await fetch(API_URL);
         const result = await response.json();
 
-        if (
-          !response.ok ||
-          !result.success
-        ) {
+        if (!response.ok || !result.success) {
           throw new Error(
             result.error ||
               result.message ||
@@ -85,7 +84,10 @@ function Alerts() {
     []
   );
 
-  // Initial load + auto refresh
+  // =====================================================
+  // INITIAL LOAD + AUTO REFRESH
+  // =====================================================
+
   useEffect(() => {
     fetchAlerts();
 
@@ -199,9 +201,7 @@ function Alerts() {
         alert.description ||
         "No additional information available.",
 
-      // Important:
-      // Old backend responses without isManaged
-      // are treated as read-only.
+      // Managed alerts can be acknowledged/resolved
       isManaged:
         alert.isManaged === true,
     }));
@@ -238,10 +238,20 @@ function Alerts() {
           alert.severity ===
             severityFilter;
 
+        /*
+         * ALL = Open Alerts
+         *
+         * Resolved alerts are hidden from the
+         * default/open view.
+         *
+         * To see resolved history, select
+         * "Resolved" from the status dropdown.
+         */
         const matchesStatus =
-          statusFilter === "ALL" ||
-          alert.status ===
-            statusFilter;
+          statusFilter === "ALL"
+            ? alert.status !== "RESOLVED"
+            : alert.status ===
+              statusFilter;
 
         return (
           matchesSearch &&
@@ -327,8 +337,9 @@ function Alerts() {
   };
 
   const formatTime = (date) => {
-    if (!date)
+    if (!date) {
       return "Unknown time";
+    }
 
     const parsed = new Date(date);
 
@@ -380,11 +391,15 @@ function Alerts() {
   return (
     <div className="space-y-6">
 
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
 
         <div>
           <div className="flex items-center gap-2">
+
             <p className="text-xs font-semibold tracking-wider text-[#3B82F6]">
               NATIONAL ALERT NETWORK
             </p>
@@ -393,6 +408,7 @@ function Alerts() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
               LIVE
             </span>
+
           </div>
 
           <h1 className="text-3xl font-bold text-[#F1F5F9] mt-2">
@@ -425,13 +441,21 @@ function Alerts() {
             ? "Refreshing..."
             : "Refresh"}
         </button>
+
       </div>
 
-      {/* STATS */}
+      {/* =====================================================
+          STATS
+      ===================================================== */}
+
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
 
+        {/* TOTAL */}
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-5">
+
           <div className="flex items-center justify-between">
+
             <div className="w-9 h-9 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center">
               <Bell
                 size={18}
@@ -442,6 +466,7 @@ function Alerts() {
             <span className="text-xs text-[#64748B]">
               TOTAL
             </span>
+
           </div>
 
           <p className="text-2xl font-bold text-[#F1F5F9] mt-4">
@@ -451,10 +476,15 @@ function Alerts() {
           <p className="text-xs text-[#64748B] mt-1">
             All alerts
           </p>
+
         </div>
 
+        {/* ACTIVE */}
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-5">
+
           <div className="flex items-center justify-between">
+
             <div className="w-9 h-9 rounded-xl bg-[#EF3340]/10 flex items-center justify-center">
               <Activity
                 size={18}
@@ -465,6 +495,7 @@ function Alerts() {
             <span className="text-xs text-[#64748B]">
               ACTIVE
             </span>
+
           </div>
 
           <p className="text-2xl font-bold text-[#F1F5F9] mt-4">
@@ -474,10 +505,15 @@ function Alerts() {
           <p className="text-xs text-[#64748B] mt-1">
             Require attention
           </p>
+
         </div>
 
+        {/* CRITICAL */}
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-5">
+
           <div className="flex items-center justify-between">
+
             <div className="w-9 h-9 rounded-xl bg-[#EF3340]/10 flex items-center justify-center">
               <ShieldAlert
                 size={18}
@@ -488,6 +524,7 @@ function Alerts() {
             <span className="text-xs text-[#64748B]">
               CRITICAL
             </span>
+
           </div>
 
           <p className="text-2xl font-bold text-[#EF3340] mt-4">
@@ -497,10 +534,15 @@ function Alerts() {
           <p className="text-xs text-[#64748B] mt-1">
             Immediate response
           </p>
+
         </div>
 
+        {/* HIGH */}
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-5">
+
           <div className="flex items-center justify-between">
+
             <div className="w-9 h-9 rounded-xl bg-[#F59E0B]/10 flex items-center justify-center">
               <AlertTriangle
                 size={18}
@@ -511,6 +553,7 @@ function Alerts() {
             <span className="text-xs text-[#64748B]">
               HIGH
             </span>
+
           </div>
 
           <p className="text-2xl font-bold text-[#F59E0B] mt-4">
@@ -520,14 +563,23 @@ function Alerts() {
           <p className="text-xs text-[#64748B] mt-1">
             Elevated risk
           </p>
+
         </div>
+
       </div>
 
-      {/* SEARCH + FILTERS */}
+      {/* =====================================================
+          SEARCH + FILTERS
+      ===================================================== */}
+
       <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-4">
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
+          {/* SEARCH */}
+
           <div className="relative">
+
             <Search
               size={17}
               className="absolute left-3 top-3 text-[#64748B]"
@@ -544,7 +596,10 @@ function Alerts() {
               placeholder="Search alerts..."
               className="w-full h-11 rounded-xl bg-[#080F1E] border border-[#1D304D] pl-10 pr-4 text-sm text-[#F1F5F9] placeholder:text-[#475569] outline-none focus:border-[#3B82F6]"
             />
+
           </div>
+
+          {/* SEVERITY */}
 
           <select
             value={severityFilter}
@@ -555,22 +610,30 @@ function Alerts() {
             }
             className="h-11 rounded-xl bg-[#080F1E] border border-[#1D304D] px-4 text-sm text-[#F1F5F9] outline-none focus:border-[#3B82F6]"
           >
+
             <option value="ALL">
               All Severities
             </option>
+
             <option value="CRITICAL">
               Critical
             </option>
+
             <option value="HIGH">
               High
             </option>
+
             <option value="MEDIUM">
               Medium
             </option>
+
             <option value="LOW">
               Low
             </option>
+
           </select>
+
+          {/* STATUS */}
 
           <select
             value={statusFilter}
@@ -581,31 +644,43 @@ function Alerts() {
             }
             className="h-11 rounded-xl bg-[#080F1E] border border-[#1D304D] px-4 text-sm text-[#F1F5F9] outline-none focus:border-[#3B82F6]"
           >
+
             <option value="ALL">
-              All Status
+              Open Alerts
             </option>
+
             <option value="ACTIVE">
               Active
             </option>
+
             <option value="ACKNOWLEDGED">
               Acknowledged
             </option>
+
             <option value="RESOLVED">
               Resolved
             </option>
+
           </select>
+
         </div>
+
       </div>
 
-      {/* ERROR */}
+      {/* =====================================================
+          ERROR
+      ===================================================== */}
+
       {error && (
         <div className="p-4 rounded-xl bg-[#EF3340]/10 border border-[#EF3340]/20 flex items-start gap-3">
+
           <XCircle
             size={19}
             className="text-[#EF3340] mt-0.5 shrink-0"
           />
 
           <div>
+
             <p className="text-sm font-medium text-[#F1F5F9]">
               Alert service unavailable
             </p>
@@ -613,13 +688,20 @@ function Alerts() {
             <p className="text-xs text-[#8FA4C7] mt-1">
               {error}
             </p>
+
           </div>
+
         </div>
       )}
 
-      {/* LOADING */}
+      {/* =====================================================
+          LOADING
+      ===================================================== */}
+
       {loading ? (
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-12 flex flex-col items-center justify-center">
+
           <RefreshCw
             size={28}
             className="text-[#3B82F6] animate-spin"
@@ -628,15 +710,20 @@ function Alerts() {
           <p className="text-sm text-[#8FA4C7] mt-4">
             Loading emergency alerts...
           </p>
+
         </div>
-      ) : filteredAlerts.length ===
-        0 ? (
+
+      ) : filteredAlerts.length === 0 ? (
+
         <div className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+
           <div className="w-14 h-14 rounded-2xl bg-[#3B82F6]/10 flex items-center justify-center">
+
             <Bell
               size={26}
               className="text-[#3B82F6]"
             />
+
           </div>
 
           <p className="text-sm font-semibold text-[#F1F5F9] mt-4">
@@ -647,12 +734,16 @@ function Alerts() {
             No alerts match the
             selected filters.
           </p>
+
         </div>
+
       ) : (
+
         <div className="space-y-4">
 
           {filteredAlerts.map(
             (alert) => {
+
               const severityColor =
                 getSeverityColor(
                   alert.severity
@@ -663,12 +754,16 @@ function Alerts() {
                 alert.id;
 
               return (
+
                 <div
                   key={alert.id}
                   className="bg-[#111C31] border border-[#1D304D] rounded-2xl p-5 hover:border-[#2B4568] transition"
                 >
 
-                  {/* TOP */}
+                  {/* =====================================================
+                      TOP
+                  ===================================================== */}
+
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
 
                     <div className="flex gap-4">
@@ -680,6 +775,7 @@ function Alerts() {
                             `${severityColor}18`,
                         }}
                       >
+
                         <AlertTriangle
                           size={21}
                           style={{
@@ -687,6 +783,7 @@ function Alerts() {
                               severityColor,
                           }}
                         />
+
                       </div>
 
                       <div className="min-w-0">
@@ -702,8 +799,10 @@ function Alerts() {
                             style={{
                               color:
                                 severityColor,
+
                               backgroundColor:
                                 `${severityColor}12`,
+
                               borderColor:
                                 `${severityColor}30`,
                             }}
@@ -716,7 +815,9 @@ function Alerts() {
                         <p className="text-xs text-[#64748B] mt-1">
                           {alert.type}
                         </p>
+
                       </div>
+
                     </div>
 
                     <span
@@ -729,58 +830,88 @@ function Alerts() {
 
                   </div>
 
-                  {/* DESCRIPTION */}
+                  {/* =====================================================
+                      DESCRIPTION
+                  ===================================================== */}
+
                   <div className="mt-4 ml-0 lg:ml-15">
+
                     <p className="text-sm text-[#8FA4C7] leading-relaxed">
                       {alert.description}
                     </p>
+
                   </div>
 
-                  {/* META */}
+                  {/* =====================================================
+                      META + ACTIONS
+                  ===================================================== */}
+
                   <div className="mt-5 pt-4 border-t border-[#1D304D] flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
 
                     <div className="flex flex-wrap gap-x-5 gap-y-2">
 
+                      {/* LOCATION */}
+
                       <div className="flex items-center gap-2 text-xs text-[#64748B]">
+
                         <MapPin
                           size={14}
                           className="text-[#3B82F6]"
                         />
+
                         <span>
                           {alert.location}
                         </span>
+
                       </div>
 
+                      {/* TIME */}
+
                       <div className="flex items-center gap-2 text-xs text-[#64748B]">
-                        <Clock3 size={14} />
+
+                        <Clock3
+                          size={14}
+                        />
+
                         <span>
                           {formatTime(
                             alert.createdAt
                           )}
                         </span>
+
                       </div>
 
+                      {/* SOURCE */}
+
                       <div className="flex items-center gap-2 text-xs text-[#64748B]">
+
                         <Activity
                           size={14}
                           className="text-[#8FA4C7]"
                         />
+
                         <span>
                           {getSourceLabel(
                             alert.source
                           )}
                         </span>
+
                       </div>
 
                     </div>
 
-                    {/* ACTIONS */}
+                    {/* =====================================================
+                        ACTIONS
+                    ===================================================== */}
+
                     <div className="flex items-center gap-2">
 
-                      {/* ONLY MANAGED MONGODB ALERTS */}
+                      {/* ACKNOWLEDGE */}
+
                       {alert.isManaged &&
                         alert.status ===
                           "ACTIVE" && (
+
                           <button
                             disabled={
                               isProcessing
@@ -793,24 +924,34 @@ function Alerts() {
                             }
                             className="h-9 px-3 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/20 text-[#F59E0B] hover:bg-[#F59E0B]/20 disabled:opacity-50 text-xs font-semibold transition flex items-center gap-2"
                           >
+
                             {isProcessing ? (
+
                               <RefreshCw
                                 size={13}
                                 className="animate-spin"
                               />
+
                             ) : (
+
                               <CheckCircle2
                                 size={13}
                               />
+
                             )}
 
                             Acknowledge
+
                           </button>
+
                         )}
+
+                      {/* RESOLVE */}
 
                       {alert.isManaged &&
                         alert.status !==
                           "RESOLVED" && (
+
                           <button
                             disabled={
                               isProcessing
@@ -823,59 +964,81 @@ function Alerts() {
                             }
                             className="h-9 px-3 rounded-lg bg-[#22C55E]/10 border border-[#22C55E]/20 text-[#22C55E] hover:bg-[#22C55E]/20 disabled:opacity-50 text-xs font-semibold transition flex items-center gap-2"
                           >
+
                             {isProcessing ? (
+
                               <RefreshCw
                                 size={13}
                                 className="animate-spin"
                               />
+
                             ) : (
+
                               <CheckCircle2
                                 size={13}
                               />
+
                             )}
 
                             Resolve
+
                           </button>
+
                         )}
 
                     </div>
+
                   </div>
 
                 </div>
+
               );
             }
           )}
 
         </div>
+
       )}
 
-      {/* FOOTER */}
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
+
       {!loading &&
         filteredAlerts.length > 0 && (
+
           <div className="flex items-center justify-between text-[11px] text-[#64748B]">
 
             <span>
               Showing{" "}
+
               <span className="text-[#8FA4C7]">
                 {
                   filteredAlerts.length
                 }
-              </span>{" "}
-              of{" "}
+              </span>
+
+              {" "}of{" "}
+
               <span className="text-[#8FA4C7]">
                 {
                   normalizedAlerts.length
                 }
-              </span>{" "}
-              alerts
+              </span>
+
+              {" "}alerts
             </span>
 
             <span className="flex items-center gap-1.5">
+
               <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+
               Auto-refreshing
+
             </span>
 
           </div>
+
         )}
 
     </div>

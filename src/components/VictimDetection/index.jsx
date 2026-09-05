@@ -11,9 +11,10 @@ import {
   ShieldCheck,
   Maximize2,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 function VictimDetection() {
   const [preview, setPreview] = useState(null);
@@ -33,8 +34,6 @@ function VictimDetection() {
   });
 
   const viewportRef = useRef(null);
-  const imgRef = useRef(null);
-  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
 
   // ---------------------------------------------
   // IMAGE UPLOAD
@@ -74,22 +73,7 @@ function VictimDetection() {
       width: event.target.naturalWidth,
       height: event.target.naturalHeight,
     });
-
-    const rect = event.target.getBoundingClientRect();
-    setStageSize({ w: rect.width, h: rect.height });
   };
-
-  useEffect(() => {
-    const update = () => {
-      if (imgRef.current) {
-        const rect = imgRef.current.getBoundingClientRect();
-        setStageSize({ w: rect.width, h: rect.height });
-      }
-    };
-
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
 
   // ---------------------------------------------
   // AI SCAN
@@ -120,7 +104,9 @@ function VictimDetection() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message || data.error || "Victim detection failed."
+          data.message ||
+            data.error ||
+            "Victim detection failed."
         );
       }
 
@@ -167,6 +153,9 @@ function VictimDetection() {
     setSelectedIndex(index);
   };
 
+  // ---------------------------------------------
+  // RESET / SHOW ALL
+  // ---------------------------------------------
   const handleResetView = () => {
     setSelectedIndex(null);
   };
@@ -205,7 +194,8 @@ function VictimDetection() {
     detections.length > 0
       ? Math.round(
           (detections.reduce(
-            (sum, item) => sum + Number(item.confidence || 0),
+            (sum, item) =>
+              sum + Number(item.confidence || 0),
             0
           ) /
             detections.length) *
@@ -226,17 +216,24 @@ function VictimDetection() {
     }
 
     return {
-      left: `${(bbox.x1 / imageDimensions.width) * 100}%`,
-      top: `${(bbox.y1 / imageDimensions.height) * 100}%`,
+      left: `${(Number(bbox.x1) / imageDimensions.width) * 100}%`,
+      top: `${(Number(bbox.y1) / imageDimensions.height) * 100}%`,
       width: `${
-        ((bbox.x2 - bbox.x1) / imageDimensions.width) * 100
+        ((Number(bbox.x2) - Number(bbox.x1)) /
+          imageDimensions.width) *
+        100
       }%`,
       height: `${
-        ((bbox.y2 - bbox.y1) / imageDimensions.height) * 100
+        ((Number(bbox.y2) - Number(bbox.y1)) /
+          imageDimensions.height) *
+        100
       }%`,
     };
   };
 
+  // ---------------------------------------------
+  // RISK COLORS
+  // ---------------------------------------------
   const getRiskColor = (confidence) => {
     const value = Number(confidence);
 
@@ -263,7 +260,9 @@ function VictimDetection() {
     };
   };
 
-  // Backend-aligned priority thresholds.
+  // ---------------------------------------------
+  // PRIORITY
+  // ---------------------------------------------
   const getPriorityLabel = (confidence) => {
     const value = Number(confidence);
 
@@ -298,85 +297,260 @@ function VictimDetection() {
 
   // ---------------------------------------------
   // ZOOM / FOCUS ON SELECTED PERSON
+  //
+  // IMPORTANT:
+  // This calculation does NOT use getBoundingClientRect()
+  // of the transformed image.
+  //
+  // It calculates the original image display size from:
+  // - natural image width/height
+  // - current viewport width/height
+  //
+  // Therefore it works for:
+  // - Landscape images
+  // - Portrait / vertical images
+  // - Square images
   // ---------------------------------------------
   const getZoomStyle = () => {
     if (
       selectedIndex === null ||
+      !detections[selectedIndex] ||
       !imageDimensions.width ||
       !imageDimensions.height ||
-      !detections[selectedIndex] ||
-      !stageSize.w ||
-      !stageSize.h ||
       !viewportRef.current
     ) {
       return {
-        transform: "translate(0px, 0px) scale(1)",
+        transform: "translate3d(0px, 0px, 0px) scale(1)",
         transformOrigin: "0 0",
       };
     }
 
     const bbox = detections[selectedIndex].bbox;
-    const natW = imageDimensions.width;
-    const natH = imageDimensions.height;
 
-    const personX = (bbox.x1 + bbox.x2) / 2;
-    const personY = (bbox.y1 + bbox.y2) / 2;
+    if (!bbox) {
+      return {
+        transform: "translate3d(0px, 0px, 0px) scale(1)",
+        transformOrigin: "0 0",
+      };
+    }
 
-    const dispW = stageSize.w;
-    const dispH = stageSize.h;
+    const viewport = viewportRef.current;
 
-    const fitScale = Math.min(dispW / natW, dispH / natH);
-    const renderedW = natW * fitScale;
-    const renderedH = natH * fitScale;
-    const offsetX = (dispW - renderedW) / 2;
-    const offsetY = (dispH - renderedH) / 2;
+    const viewportWidth = viewport.clientWidth;
+    const viewportHeight = viewport.clientHeight;
 
-    const personStageX = offsetX + personX * fitScale;
-    const personStageY = offsetY + personY * fitScale;
+    if (!viewportWidth || !viewportHeight) {
+      return {
+        transform: "translate3d(0px, 0px, 0px) scale(1)",
+        transformOrigin: "0 0",
+      };
+    }
 
-    const boxW = bbox.x2 - bbox.x1;
-    const boxH = bbox.y2 - bbox.y1;
-    const scaleX = (natW * 0.55) / boxW;
-    const scaleY = (natH * 0.55) / boxH;
-    const zoom = Math.min(Math.max(Math.min(scaleX, scaleY), 1.6), 4);
+    const naturalWidth = Number(imageDimensions.width);
+    const naturalHeight = Number(imageDimensions.height);
 
-    const vpRect = viewportRef.current.getBoundingClientRect();
-    const vpW = vpRect.width;
-    const vpH = vpRect.height;
+    // ---------------------------------------------
+    // ORIGINAL IMAGE FIT SCALE
+    //
+    // Same basic behavior as object-contain:
+    // image fits inside viewport without distortion.
+    // ---------------------------------------------
+    const fitScale = Math.min(
+      viewportWidth / naturalWidth,
+      viewportHeight / naturalHeight
+    );
 
-    const wrapperLeft = (vpW - dispW) / 2;
-    const wrapperTop = (vpH - dispH) / 2;
+    const baseWidth = naturalWidth * fitScale;
+    const baseHeight = naturalHeight * fitScale;
 
-    let tx = vpW / 2 - wrapperLeft - personStageX * zoom;
-    let ty = vpH / 2 - wrapperTop - personStageY * zoom;
+    // ---------------------------------------------
+    // IMAGE POSITION BEFORE ZOOM
+    //
+    // The viewport uses flex items-center justify-center,
+    // so the image is centered.
+    // ---------------------------------------------
+    const baseLeft =
+      (viewportWidth - baseWidth) / 2;
 
-    const imgZoomedLeft = offsetX * zoom;
-    const imgZoomedRight = (offsetX + renderedW) * zoom;
-    const imgZoomedTop = offsetY * zoom;
-    const imgZoomedBottom = (offsetY + renderedH) * zoom;
+    const baseTop =
+      (viewportHeight - baseHeight) / 2;
 
-    const txMin = -(wrapperLeft + imgZoomedRight);
-    const txMax = vpW - wrapperLeft - imgZoomedLeft;
-    tx = Math.max(txMin, Math.min(txMax, tx));
+    // ---------------------------------------------
+    // SELECTED PERSON CENTER
+    // ---------------------------------------------
+    const x1 = Number(bbox.x1);
+    const y1 = Number(bbox.y1);
+    const x2 = Number(bbox.x2);
+    const y2 = Number(bbox.y2);
 
-    const tyMin = -(wrapperTop + imgZoomedBottom);
-    const tyMax = vpH - wrapperTop - imgZoomedTop;
-    ty = Math.max(tyMin, Math.min(tyMax, ty));
+    const personCenterX = (x1 + x2) / 2;
+    const personCenterY = (y1 + y2) / 2;
+
+    // Convert natural image coordinates
+    // to displayed image coordinates.
+    const personX =
+      personCenterX * fitScale;
+
+    const personY =
+      personCenterY * fitScale;
+
+    // ---------------------------------------------
+    // PERSON BOX SIZE
+    // ---------------------------------------------
+    const personWidth = Math.max(
+      x2 - x1,
+      1
+    );
+
+    const personHeight = Math.max(
+      y2 - y1,
+      1
+    );
+
+    // ---------------------------------------------
+    // ZOOM LEVEL
+    //
+    // Larger persons don't need extreme zoom.
+    // Smaller aerial victims get stronger zoom.
+    //
+    // Minimum: 1.8x
+    // Maximum: 4x
+    // ---------------------------------------------
+    const zoomX =
+      (naturalWidth * 0.55) /
+      personWidth;
+
+    const zoomY =
+      (naturalHeight * 0.55) /
+      personHeight;
+
+    let zoom = Math.min(
+      zoomX,
+      zoomY
+    );
+
+    zoom = Math.max(
+      zoom,
+      1.8
+    );
+
+    zoom = Math.min(
+      zoom,
+      4
+    );
+
+    // ---------------------------------------------
+    // MAKE SURE ZOOMED IMAGE CAN COVER VIEWPORT
+    // ---------------------------------------------
+    const minimumCoverZoom = Math.max(
+      viewportWidth / baseWidth,
+      viewportHeight / baseHeight
+    );
+
+    zoom = Math.max(
+      zoom,
+      minimumCoverZoom
+    );
+
+    // Prevent excessive zoom.
+    zoom = Math.min(zoom, 4);
+
+    // ---------------------------------------------
+    // MOVE SELECTED PERSON TO VIEWPORT CENTER
+    //
+    // The wrapper is centered initially.
+    // transform-origin = 0 0.
+    // ---------------------------------------------
+    let translateX =
+      viewportWidth / 2 -
+      baseLeft -
+      personX * zoom;
+
+    let translateY =
+      viewportHeight / 2 -
+      baseTop -
+      personY * zoom;
+
+    // ---------------------------------------------
+    // ZOOMED IMAGE DIMENSIONS
+    // ---------------------------------------------
+    const zoomedWidth =
+      baseWidth * zoom;
+
+    const zoomedHeight =
+      baseHeight * zoom;
+
+    // ---------------------------------------------
+    // CLAMP HORIZONTAL POSITION
+    //
+    // Keep the zoomed image inside the viewport.
+    // This prevents the image from completely
+    // disappearing into the black background.
+    // ---------------------------------------------
+    const minTranslateX =
+      viewportWidth -
+      baseLeft -
+      zoomedWidth;
+
+    const maxTranslateX =
+      -baseLeft;
+
+    if (zoomedWidth >= viewportWidth) {
+      translateX = Math.min(
+        Math.max(
+          translateX,
+          minTranslateX
+        ),
+        maxTranslateX
+      );
+    } else {
+      translateX =
+        (viewportWidth - baseWidth) / 2 -
+        baseLeft;
+    }
+
+    // ---------------------------------------------
+    // CLAMP VERTICAL POSITION
+    // ---------------------------------------------
+    const minTranslateY =
+      viewportHeight -
+      baseTop -
+      zoomedHeight;
+
+    const maxTranslateY =
+      -baseTop;
+
+    if (zoomedHeight >= viewportHeight) {
+      translateY = Math.min(
+        Math.max(
+          translateY,
+          minTranslateY
+        ),
+        maxTranslateY
+      );
+    } else {
+      translateY =
+        (viewportHeight - baseHeight) / 2 -
+        baseTop;
+    }
 
     return {
-      transform: `translate(${tx}px, ${ty}px) scale(${zoom})`,
+      transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${zoom})`,
       transformOrigin: "0 0",
     };
   };
 
   const selectedDetection =
-    selectedIndex !== null ? detections[selectedIndex] : null;
+    selectedIndex !== null
+      ? detections[selectedIndex]
+      : null;
 
   return (
     <div className="space-y-6">
 
       {/* PAGE HEADER */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+
         <div>
           <p className="text-xs font-semibold tracking-[0.18em] text-[#EF3340]">
             AI VICTIM DETECTION
@@ -394,17 +568,20 @@ function VictimDetection() {
         </div>
 
         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#22C55E]/10 border border-[#22C55E]/20">
+
           <span className="w-2 h-2 rounded-full bg-[#22C55E] animate-pulse" />
 
           <span className="text-xs font-medium text-[#86EFAC]">
             AI SYSTEM ONLINE
           </span>
+
         </div>
       </div>
 
       {/* ERROR MESSAGE */}
       {error && (
         <div className="flex items-start gap-3 p-4 rounded-xl bg-[#EF3340]/10 border border-[#EF3340]/30">
+
           <AlertTriangle
             size={18}
             className="text-[#EF3340] mt-0.5 shrink-0"
@@ -419,6 +596,7 @@ function VictimDetection() {
               {error}
             </p>
           </div>
+
         </div>
       )}
 
@@ -430,13 +608,16 @@ function VictimDetection() {
 
           {/* PANEL HEADER */}
           <div className="flex items-center justify-between mb-5">
+
             <div className="flex items-center gap-3">
 
               <div className="w-10 h-10 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center">
+
                 <ImageIcon
                   size={20}
                   className="text-[#3B82F6]"
                 />
+
               </div>
 
               <div>
@@ -454,13 +635,18 @@ function VictimDetection() {
             <span className="px-3 py-1.5 rounded-full text-[10px] font-semibold tracking-wide bg-[#3B82F6]/10 text-[#60A5FA] border border-[#3B82F6]/20">
               YOLO AI
             </span>
+
           </div>
 
           {/* IMAGE AREA */}
-          <div ref={viewportRef} className="relative h-[420px] rounded-xl border border-dashed border-[#1D304D] bg-[#080F1E] overflow-hidden flex items-center justify-center">
+          <div
+            ref={viewportRef}
+            className="relative h-[420px] rounded-xl border border-dashed border-[#1D304D] bg-[#080F1E] overflow-hidden flex items-center justify-center"
+          >
 
             {preview ? (
               <>
+
                 {/* IMAGE + DETECTION OVERLAY */}
                 <div
                   className="relative max-w-full max-h-full transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
@@ -468,7 +654,6 @@ function VictimDetection() {
                 >
 
                   <img
-                    ref={imgRef}
                     src={preview}
                     alt="Uploaded disaster"
                     onLoad={handleImageLoad}
@@ -478,74 +663,88 @@ function VictimDetection() {
                   {/* REAL YOLO BOXES */}
                   {detected &&
                     !scanning &&
-                    detections.map((detection, index) => {
-                      const colors = getRiskColor(
-                        detection.confidence
-                      );
+                    detections.map(
+                      (detection, index) => {
+                        const colors =
+                          getRiskColor(
+                            detection.confidence
+                          );
 
-                      const isSelected =
-                        selectedIndex === index;
-                      const isDimmed =
-                        selectedIndex !== null &&
-                        selectedIndex !== index;
+                        const isSelected =
+                          selectedIndex === index;
 
-                      return (
-                        <div
-                          key={index}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() =>
-                            handleSelectPerson(index)
-                          }
-                          onKeyDown={(event) => {
-                            if (
-                              event.key === "Enter" ||
-                              event.key === " "
-                            ) {
-                              handleSelectPerson(index);
+                        const isDimmed =
+                          selectedIndex !== null &&
+                          selectedIndex !== index;
+
+                        return (
+                          <div
+                            key={index}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Select ${formatPersonId(index)}`}
+                            onClick={() =>
+                              handleSelectPerson(
+                                index
+                              )
                             }
-                          }}
-                          className={`
-                            absolute border-2 ${colors.border} rounded-md
-                            cursor-pointer transition-all duration-300
-                            ${
-                              isSelected
-                                ? "ring-2 ring-white/50 shadow-[0_0_20px_rgba(239,51,64,0.45)] z-20"
-                                : ""
-                            }
-                            ${
-                              isDimmed
-                                ? "opacity-30"
-                                : "opacity-100"
-                            }
-                          `}
-                          style={getBoxStyle(
-                            detection.bbox
-                          )}
-                        >
-                          {/* COMPACT MARKER */}
-                          <span
+                            onKeyDown={(event) => {
+                              if (
+                                event.key ===
+                                  "Enter" ||
+                                event.key === " "
+                              ) {
+                                event.preventDefault();
+
+                                handleSelectPerson(
+                                  index
+                                );
+                              }
+                            }}
                             className={`
-                              absolute -top-[18px] -left-[6px]
-                              min-w-[28px] h-[18px]
-                              flex items-center justify-center
-                              px-1.5 ${colors.bg} ${colors.text}
-                              text-[10px] font-bold rounded-md
-                              border border-white/10
-                              shadow-md
-                              transition-transform duration-300
+                              absolute border-2 ${colors.border} rounded-md
+                              cursor-pointer transition-all duration-300
                               ${
                                 isSelected
-                                  ? "scale-110 z-30"
+                                  ? "ring-2 ring-white/50 shadow-[0_0_20px_rgba(239,51,64,0.45)] z-20"
                                   : ""
                               }
+                              ${
+                                isDimmed
+                                  ? "opacity-30"
+                                  : "opacity-100"
+                              }
                             `}
+                            style={getBoxStyle(
+                              detection.bbox
+                            )}
                           >
-                            {formatPersonId(index)}
-                          </span>
-                        </div>
-                      );
-                    })}
+
+                            {/* COMPACT MARKER */}
+                            <span
+                              className={`
+                                absolute -top-[18px] -left-[6px]
+                                min-w-[28px] h-[18px]
+                                flex items-center justify-center
+                                px-1.5 ${colors.bg} ${colors.text}
+                                text-[10px] font-bold rounded-md
+                                border border-white/10
+                                shadow-md
+                                transition-transform duration-300
+                                ${
+                                  isSelected
+                                    ? "scale-110 z-30"
+                                    : ""
+                                }
+                              `}
+                            >
+                              {formatPersonId(index)}
+                            </span>
+
+                          </div>
+                        );
+                      }
+                    )}
 
                   {/* SCANNING OVERLAY */}
                   {scanning && (
@@ -554,15 +753,18 @@ function VictimDetection() {
                       <div className="absolute left-0 right-0 h-[2px] bg-[#22C55E] shadow-[0_0_15px_#22C55E] animate-[scan_1.8s_linear_infinite]" />
 
                       <div className="absolute inset-0 flex items-center justify-center">
+
                         <div className="px-5 py-3 rounded-xl bg-[#080D1A]/90 border border-[#22C55E]/30 backdrop-blur-sm">
 
                           <div className="flex items-center gap-3">
+
                             <ScanLine
                               size={20}
                               className="text-[#22C55E] animate-pulse"
                             />
 
                             <div>
+
                               <p className="text-sm font-semibold text-white">
                                 AI Scanning...
                               </p>
@@ -570,10 +772,13 @@ function VictimDetection() {
                               <p className="text-[11px] text-[#8FA4C7]">
                                 YOLO is detecting human presence
                               </p>
+
                             </div>
+
                           </div>
 
                         </div>
+
                       </div>
 
                     </div>
@@ -584,6 +789,7 @@ function VictimDetection() {
                 {/* REAL DETECTION STATUS */}
                 {detected && !scanning && (
                   <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-[#080D1A]/85 border border-[#EF3340]/30 backdrop-blur-sm">
+
                     <div className="flex items-center gap-2">
 
                       <span className="w-2 h-2 rounded-full bg-[#EF3340] animate-pulse" />
@@ -597,22 +803,28 @@ function VictimDetection() {
                       </span>
 
                     </div>
+
                   </div>
                 )}
 
                 {/* FLOATING INFO CARD */}
                 {selectedDetection && (
                   <div className="absolute top-4 right-4 px-4 py-3 rounded-xl bg-[#111C31]/95 border border-[#1D304D] backdrop-blur-sm shadow-xl z-30 min-w-[150px]">
+
                     <p className="text-[10px] text-[#8FA4C7] uppercase tracking-wider">
                       Person ID
                     </p>
 
                     <p className="text-lg font-bold text-[#F1F5F9]">
-                      {formatPersonId(selectedIndex)}
+                      {formatPersonId(
+                        selectedIndex
+                      )}
                     </p>
 
                     <div className="mt-2 space-y-1">
+
                       <div className="flex items-center justify-between text-xs">
+
                         <span className="text-[#8FA4C7]">
                           Confidence
                         </span>
@@ -625,9 +837,11 @@ function VictimDetection() {
                           )}
                           %
                         </span>
+
                       </div>
 
                       <div className="flex items-center justify-between text-xs">
+
                         <span className="text-[#8FA4C7]">
                           Priority
                         </span>
@@ -645,17 +859,22 @@ function VictimDetection() {
                             ).label
                           }
                         </span>
+
                       </div>
+
                     </div>
+
                   </div>
                 )}
 
                 {/* RESET VIEW CONTROL */}
                 {detected && !scanning && (
                   <button
+                    type="button"
                     onClick={handleResetView}
                     className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-[#111C31]/90 border border-[#1D304D] hover:bg-[#16233A] hover:border-[#3B82F6]/40 transition backdrop-blur-sm z-30"
                   >
+
                     <Maximize2
                       size={14}
                       className="text-[#3B82F6]"
@@ -664,31 +883,39 @@ function VictimDetection() {
                     <span className="text-xs font-medium text-[#F1F5F9]">
                       Show All
                     </span>
+
                   </button>
                 )}
 
                 {/* REMOVE BUTTON */}
                 {!scanning && (
                   <button
+                    type="button"
                     onClick={removeImage}
+                    aria-label="Remove image"
                     className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-[#080D1A]/80 border border-[#1D304D] flex items-center justify-center hover:bg-[#EF3340]/20 hover:border-[#EF3340]/40 transition"
                   >
+
                     <X
                       size={17}
                       className="text-[#CBD5E1]"
                     />
+
                   </button>
                 )}
 
               </>
             ) : (
+
               <label className="cursor-pointer flex flex-col items-center justify-center text-center">
 
                 <div className="w-16 h-16 rounded-2xl bg-[#1D304D]/50 border border-[#1D304D] flex items-center justify-center mb-4">
+
                   <Upload
                     size={28}
                     className="text-[#8FA4C7]"
                   />
+
                 </div>
 
                 <p className="text-sm font-medium text-[#F1F5F9]">
@@ -719,9 +946,13 @@ function VictimDetection() {
           <div className="flex gap-3 mt-5">
 
             <label className="flex-1 cursor-pointer">
+
               <div className="w-full h-11 rounded-xl border border-[#1D304D] hover:bg-[#16233A] flex items-center justify-center gap-2 text-sm font-medium transition text-[#F1F5F9]">
+
                 <Upload size={17} />
+
                 Choose Image
+
               </div>
 
               <input
@@ -730,18 +961,22 @@ function VictimDetection() {
                 className="hidden"
                 onChange={handleImageUpload}
               />
+
             </label>
 
             <button
+              type="button"
               onClick={handleScan}
               disabled={!selectedFile || scanning}
               className="flex-1 h-11 rounded-xl bg-[#EF3340] hover:bg-[#D92D3A] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition flex items-center justify-center gap-2"
             >
+
               <ScanLine size={17} />
 
               {scanning
                 ? "Analyzing..."
                 : "Analyze Image"}
+
             </button>
 
           </div>
@@ -755,13 +990,16 @@ function VictimDetection() {
           <div className="flex items-center gap-3 mb-6">
 
             <div className="w-10 h-10 rounded-xl bg-[#EF3340]/10 flex items-center justify-center">
+
               <Users
                 size={20}
                 className="text-[#EF3340]"
               />
+
             </div>
 
             <div>
+
               <h2 className="font-semibold text-[#F1F5F9]">
                 Detection Results
               </h2>
@@ -769,6 +1007,7 @@ function VictimDetection() {
               <p className="text-xs text-[#64748B] mt-1">
                 Live AI analysis output
               </p>
+
             </div>
 
           </div>
@@ -778,10 +1017,12 @@ function VictimDetection() {
             <div className="h-[300px] flex flex-col items-center justify-center text-center">
 
               <div className="w-16 h-16 rounded-2xl bg-[#080F1E] flex items-center justify-center mb-4">
+
                 <Users
                   size={32}
                   className="text-[#1D304D]"
                 />
+
               </div>
 
               <p className="text-sm text-[#8FA4C7]">
@@ -805,6 +1046,7 @@ function VictimDetection() {
                 <div className="flex items-center justify-between">
 
                   <div>
+
                     <p className="text-xs text-[#8FA4C7]">
                       TOTAL PERSONS
                     </p>
@@ -812,13 +1054,16 @@ function VictimDetection() {
                     <p className="text-4xl font-bold text-[#EF3340] mt-1">
                       {totalVictims}
                     </p>
+
                   </div>
 
                   <div className="w-12 h-12 rounded-xl bg-[#EF3340]/10 flex items-center justify-center">
+
                     <Users
                       size={25}
                       className="text-[#EF3340]"
                     />
+
                   </div>
 
                 </div>
@@ -829,13 +1074,16 @@ function VictimDetection() {
               <div className="flex items-center gap-3 p-4 rounded-xl bg-[#EF3340]/10 border border-[#EF3340]/20">
 
                 <div className="w-9 h-9 rounded-lg bg-[#EF3340]/10 flex items-center justify-center">
+
                   <AlertTriangle
                     size={18}
                     className="text-[#EF3340]"
                   />
+
                 </div>
 
                 <div>
+
                   <p className="text-sm font-medium text-[#F8FAFC]">
                     {highRisk} high priority
                   </p>
@@ -843,6 +1091,7 @@ function VictimDetection() {
                   <p className="text-xs text-[#64748B] mt-1">
                     Confidence ≥ 75%
                   </p>
+
                 </div>
 
               </div>
@@ -851,6 +1100,7 @@ function VictimDetection() {
               <div className="grid grid-cols-2 gap-3">
 
                 <div className="p-3 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+
                   <p className="text-[10px] text-[#FBBF24]">
                     MEDIUM
                   </p>
@@ -858,9 +1108,11 @@ function VictimDetection() {
                   <p className="text-2xl font-bold text-[#F59E0B] mt-1">
                     {mediumRisk}
                   </p>
+
                 </div>
 
                 <div className="p-3 rounded-xl bg-[#22C55E]/10 border border-[#22C55E]/20">
+
                   <p className="text-[10px] text-[#86EFAC]">
                     LOW
                   </p>
@@ -868,6 +1120,7 @@ function VictimDetection() {
                   <p className="text-2xl font-bold text-[#22C55E] mt-1">
                     {lowRisk}
                   </p>
+
                 </div>
 
               </div>
@@ -876,13 +1129,16 @@ function VictimDetection() {
               <div className="flex items-center gap-3 p-4 rounded-xl bg-[#22C55E]/10 border border-[#22C55E]/20">
 
                 <div className="w-9 h-9 rounded-lg bg-[#22C55E]/10 flex items-center justify-center">
+
                   <ShieldCheck
                     size={18}
                     className="text-[#22C55E]"
                   />
+
                 </div>
 
                 <div>
+
                   <p className="text-sm font-medium text-[#F8FAFC]">
                     {averageConfidence}% confidence
                   </p>
@@ -890,74 +1146,99 @@ function VictimDetection() {
                   <p className="text-xs text-[#64748B] mt-1">
                     Average AI detection confidence
                   </p>
+
                 </div>
 
               </div>
 
               {/* DETECTED PERSONS LIST */}
               <div className="flex-1 min-h-0 flex flex-col">
+
                 <p className="text-xs text-[#8FA4C7] uppercase tracking-wider mb-2">
                   Detected Persons
                 </p>
 
                 <div className="flex-1 overflow-y-auto pr-1 -mr-1 max-h-[260px]">
+
                   <div className="space-y-2">
-                    {detections.map((detection, index) => {
-                      const priority = getPriorityLabel(
-                        detection.confidence
-                      );
 
-                      const isSelected =
-                        selectedIndex === index;
+                    {detections.map(
+                      (detection, index) => {
+                        const priority =
+                          getPriorityLabel(
+                            detection.confidence
+                          );
 
-                      return (
-                        <button
-                          key={index}
-                          onClick={() =>
-                            handleSelectPerson(index)
-                          }
-                          className={`
-                            w-full flex items-center justify-between
-                            px-3 py-2.5 rounded-xl border text-left
-                            transition-all duration-200
-                            ${
-                              isSelected
-                                ? "bg-[#3B82F6]/15 border-[#3B82F6]/50"
-                                : "bg-[#080F1E] border-[#1D304D] hover:bg-[#16233A] hover:border-[#3B82F6]/30"
+                        const isSelected =
+                          selectedIndex === index;
+
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() =>
+                              handleSelectPerson(
+                                index
+                              )
                             }
-                          `}
-                        >
-                          <div className="flex items-center gap-3">
+                            className={`
+                              w-full flex items-center justify-between
+                              px-3 py-2.5 rounded-xl border text-left
+                              transition-all duration-200
+                              ${
+                                isSelected
+                                  ? "bg-[#3B82F6]/15 border-[#3B82F6]/50"
+                                  : "bg-[#080F1E] border-[#1D304D] hover:bg-[#16233A] hover:border-[#3B82F6]/30"
+                              }
+                            `}
+                          >
+
+                            <div className="flex items-center gap-3">
+
+                              <span
+                                className={`
+                                  w-9 h-6 rounded-md flex items-center justify-center
+                                  text-[10px] font-bold
+                                  ${priority.bg}
+                                  ${priority.color}
+                                  ${priority.border}
+                                `}
+                              >
+                                {formatPersonId(index)}
+                              </span>
+
+                              <span className="text-sm font-medium text-[#F1F5F9]">
+                                {Math.round(
+                                  Number(
+                                    detection.confidence
+                                  ) * 100
+                                )}
+                                %
+                              </span>
+
+                            </div>
+
                             <span
                               className={`
-                                w-9 h-6 rounded-md flex items-center justify-center
                                 text-[10px] font-bold
-                                ${priority.bg} ${priority.color} ${priority.border}
+                                px-2 py-1 rounded-md border
+                                ${priority.bg}
+                                ${priority.color}
+                                ${priority.border}
                               `}
                             >
-                              {formatPersonId(index)}
+                              {priority.label}
                             </span>
 
-                            <span className="text-sm font-medium text-[#F1F5F9]">
-                              {Math.round(
-                                Number(
-                                  detection.confidence
-                                ) * 100
-                              )}
-                              %
-                            </span>
-                          </div>
+                          </button>
+                        );
+                      }
+                    )}
 
-                          <span
-                            className={`text-[10px] font-bold px-2 py-1 rounded-md border ${priority.bg} ${priority.color} ${priority.border}`}
-                          >
-                            {priority.label}
-                          </span>
-                        </button>
-                      );
-                    })}
                   </div>
+
                 </div>
+
               </div>
 
               {/* LOCATION */}
@@ -969,6 +1250,7 @@ function VictimDetection() {
                 />
 
                 <div>
+
                   <p className="text-[11px] text-[#64748B]">
                     DETECTION ZONE
                   </p>
@@ -976,6 +1258,7 @@ function VictimDetection() {
                   <p className="text-xs text-[#CBD5E1] mt-1">
                     AI image analysis zone
                   </p>
+
                 </div>
 
               </div>
@@ -989,6 +1272,7 @@ function VictimDetection() {
                 />
 
                 <div>
+
                   <p className="text-[11px] text-[#64748B]">
                     ANALYSIS STATUS
                   </p>
@@ -996,6 +1280,7 @@ function VictimDetection() {
                   <p className="text-xs text-[#CBD5E1] mt-1">
                     AI detection completed
                   </p>
+
                 </div>
 
                 <CheckCircle
@@ -1010,6 +1295,7 @@ function VictimDetection() {
           )}
 
         </div>
+
       </div>
 
       {/* BOTTOM STATUS */}
@@ -1021,13 +1307,16 @@ function VictimDetection() {
             <div className="flex items-center gap-3">
 
               <div className="w-9 h-9 rounded-lg bg-[#22C55E]/10 flex items-center justify-center">
+
                 <CheckCircle
                   size={18}
                   className="text-[#22C55E]"
                 />
+
               </div>
 
               <div>
+
                 <p className="text-sm font-medium text-[#F1F5F9]">
                   AI analysis completed successfully
                 </p>
@@ -1036,6 +1325,7 @@ function VictimDetection() {
                   Real YOLO detections are ready for
                   rescue coordination.
                 </p>
+
               </div>
 
             </div>

@@ -10,6 +10,7 @@ const sosRoutes = require("./routes/sosroutes");
 const chatRoutes = require("./routes/chatroutes");
 const alertRoutes = require("./routes/alertroutes");
 const authRoutes = require("./routes/authroutes");
+const floodMonitorRoutes = require("./routes/floodmonitorroutes");
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use("/api/sos", sosRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/flood/monitor", floodMonitorRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

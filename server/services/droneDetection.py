@@ -14,8 +14,9 @@ from ultralytics import YOLO
 # aerial/disaster footage occupy more pixels before YOLO sees them.
 #
 # Pipeline:
-#   frame -> 2x2 overlapping tiles -> YOLO26m person detection
+#   frame -> 3x3 overlapping tiles -> YOLO26m person detection
 #         -> merge duplicate boxes -> lightweight tracking
+#         -> temporal confirmation (suppress one-frame false positives)
 #         -> HawkVision JSON + annotated MJPEG
 #
 # NOTE: A COCO pretrained YOLO model detects PERSON. HawkVision
@@ -26,7 +27,7 @@ from ultralytics import YOLO
 # ------------------------------------------------------------
 # DETECTION SETTINGS
 # ------------------------------------------------------------
-CONFIDENCE_THRESHOLD = 0.12
+CONFIDENCE_THRESHOLD = 0.20
 IOU_THRESHOLD = 0.45
 IMAGE_SIZE = 1280
 MAX_DETECTIONS = 100
@@ -34,12 +35,26 @@ PERSON_CLASS_ID = 0
 
 # ------------------------------------------------------------
 # SLICING SETTINGS
-# Exactly 2x2 overlapping tiles. This avoids the 3x3/4x4 slowdown
-# that can happen when generic sliding-window code is used.
-# ------------------------------------------------------------
-TILE_ROWS = 2
-TILE_COLS = 2
+# Exactly 3x3 overlapping tiles. This avoids the slowdown that can
+# happen when generic sliding-window code is used with more tiles.
+TILE_ROWS = 3
+TILE_COLS = 3
 TILE_OVERLAP = 0.20
+
+# Recorded-video live analysis: emit at most ~2 AI frames/sec.
+# This prevents the Python process from racing far ahead of the HTML5 video.
+LIVE_SAMPLE_INTERVAL = 0.50
+
+# ------------------------------------------------------------
+# TEMPORAL CONFIRMATION SETTINGS
+# CONFIDENCE_THRESHOLD stays the YOLO inference floor (kept at 0.12
+# so weak/blurry people still reach the tracker). A detection is only
+# REPORTED once its track has been observed on TRACK_MIN_HITS frames,
+# or immediately when YOLO is confident enough (TRACK_STRONG_CONF).
+# One-frame flickers on debris/water are therefore never shown.
+# ------------------------------------------------------------
+TRACK_MIN_HITS = 2
+TRACK_STRONG_CONF = 0.50
 
 # ------------------------------------------------------------
 # LIGHTWEIGHT PERSON TRACKING SETTINGS
@@ -47,7 +62,7 @@ TILE_OVERLAP = 0.20
 # then tracked in the original full-frame coordinate system.
 # ------------------------------------------------------------
 TRACK_MAX_DISTANCE = 110
-TRACK_MAX_MISSED = 8
+TRACK_MAX_MISSED = 3
 TRACK_IOU_MATCH = 0.08
 
 
@@ -157,7 +172,7 @@ def load_model(model_path):
 
 
 # ============================================================
-# 2x2 OVERLAPPING TILES
+# 3x3 OVERLAPPING TILES
 # ============================================================
 
 def _tile_start_positions(full_size, tile_size, count):
@@ -187,7 +202,7 @@ def _tile_start_positions(full_size, tile_size, count):
 
 
 def generate_tiles(frame):
-    """Create a 2x2 set of overlapping crops in full-frame coordinates."""
+    """Create a 3x3 set of overlapping crops in full-frame coordinates."""
     if frame is None or frame.size == 0:
         return []
 
@@ -196,10 +211,10 @@ def generate_tiles(frame):
     if width <= 0 or height <= 0:
         return []
 
-    # For 2 overlapping tiles, tile = full / (2 - overlap).
-    # Example 1920px width -> ~1067px tile with 20% overlap.
-    tile_width = int(math.ceil(width / (TILE_COLS - TILE_OVERLAP)))
-    tile_height = int(math.ceil(height / (TILE_ROWS - TILE_OVERLAP)))
+    # For N tiles with overlap fraction o, tile = full / (N - o*(N-1)).
+    # Example 640px width, 3 cols, 20% overlap -> 246px tile, 128px overlap.
+    tile_width = int(math.ceil(width / (TILE_COLS - TILE_OVERLAP * (TILE_COLS - 1))))
+    tile_height = int(math.ceil(height / (TILE_ROWS - TILE_OVERLAP * (TILE_ROWS - 1))))
 
     tile_width = min(width, max(1, tile_width))
     tile_height = min(height, max(1, tile_height))
@@ -210,8 +225,8 @@ def generate_tiles(frame):
     tiles = []
     seen = set()
 
-    for y in ys:
-        for x in xs:
+    for row, y in enumerate(ys):
+        for col, x in enumerate(xs):
             x2 = min(width, x + tile_width)
             y2 = min(height, y + tile_height)
 
@@ -227,6 +242,8 @@ def generate_tiles(frame):
                 continue
 
             tiles.append({
+                "row": row,
+                "col": col,
                 "x": x,
                 "y": y,
                 "x2": x2,
@@ -308,7 +325,7 @@ def merge_sliced_detections(raw_detections):
 
 def sliced_detect(model, frame):
     """
-    Run YOLO on 2x2 overlapping crops and map all boxes back to the
+    Run YOLO on 3x3 overlapping crops and map all boxes back to the
     original frame. Only person class is requested from YOLO.
     """
     if frame is None or frame.size == 0:
@@ -326,9 +343,11 @@ def sliced_detect(model, frame):
 
     frame_height, frame_width = frame.shape[:2]
 
-    for tile_index, tile in enumerate(tiles):
+    for tile in tiles:
         offset_x = tile["x"]
         offset_y = tile["y"]
+        tile_row = tile["row"]
+        tile_col = tile["col"]
         tile_image = tile["image"]
 
         try:
@@ -343,7 +362,7 @@ def sliced_detect(model, frame):
             )
         except Exception as error:
             print(
-                f"[SLICE ERROR] tile={tile_index}: {error}",
+                f"[SLICE ERROR] tile=({tile_row},{tile_col}): {error}",
                 file=sys.stderr,
                 flush=True,
             )
@@ -373,10 +392,26 @@ def sliced_detect(model, frame):
                     .numpy()
                 )
 
-                x1 = int(round(coordinates[0])) + offset_x
-                y1 = int(round(coordinates[1])) + offset_y
-                x2 = int(round(coordinates[2])) + offset_x
-                y2 = int(round(coordinates[3])) + offset_y
+                tile_x1 = int(round(coordinates[0]))
+                tile_y1 = int(round(coordinates[1]))
+                tile_x2 = int(round(coordinates[2]))
+                tile_y2 = int(round(coordinates[3]))
+
+                x1 = tile_x1 + offset_x
+                y1 = tile_y1 + offset_y
+                x2 = tile_x2 + offset_x
+                y2 = tile_y2 + offset_y
+
+                print(
+                    "[PERSON DEBUG] "
+                    f"tile=({tile_row},{tile_col}) "
+                    f"tile_offset=({offset_x},{offset_y}) "
+                    f"tile_bbox=({tile_x1},{tile_y1},{tile_x2},{tile_y2}) "
+                    f"original_bbox=({x1},{y1},{x2},{y2}) "
+                    f"confidence={confidence:.3f}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
                 x1 = max(0, min(frame_width - 1, x1))
                 y1 = max(0, min(frame_height - 1, y1))
@@ -390,16 +425,6 @@ def sliced_detect(model, frame):
                     "box": (x1, y1, x2, y2),
                     "confidence": confidence,
                 })
-
-                print(
-                    "[YOLO SLICE] "
-                    f"tile={tile_index} "
-                    "class=person "
-                    f"confidence={confidence:.3f} "
-                    f"bbox=({x1},{y1},{x2},{y2})",
-                    file=sys.stderr,
-                    flush=True,
-                )
 
             except Exception as error:
                 print(
@@ -426,7 +451,11 @@ def sliced_detect(model, frame):
 class PersonTracker:
     """
     Simple frame-to-frame tracker in original-frame coordinates.
-    It keeps IDs stable after sliced detections are merged.
+    It keeps IDs stable after sliced detections are merged, and counts
+    how many frames each track has been observed on so one-frame false
+    positives can be suppressed (temporal confirmation). It never
+    re-emits boxes for frames where YOLO found nothing, so it cannot
+    invent people.
     """
 
     def __init__(self):
@@ -446,6 +475,17 @@ class PersonTracker:
     def diagonal(box):
         x1, y1, x2, y2 = box
         return max(1.0, math.hypot(x2 - x1, y2 - y1))
+
+    @staticmethod
+    def _is_confirmed(hits, confidence):
+        """
+        A detection is reportable once its track has been seen on
+        TRACK_MIN_HITS frames, or immediately at a strong confidence.
+        """
+        return (
+            hits >= TRACK_MIN_HITS
+            or float(confidence) >= TRACK_STRONG_CONF
+        )
 
     def update(self, detections):
         for track in self.tracks.values():
@@ -495,15 +535,21 @@ class PersonTracker:
             detection = detections[detection_index]
             box = detection["box"]
             center = self.center(box)
+            hits = self.tracks[track_id].get("hits", 0) + 1
 
             self.tracks[track_id].update({
                 "box": box,
                 "center": center,
                 "confidence": detection["confidence"],
                 "missed": 0,
+                "hits": hits,
             })
 
             detection["track_id"] = track_id
+            detection["confirmed"] = self._is_confirmed(
+                hits,
+                detection["confidence"],
+            )
 
             used_tracks.add(track_id)
             used_detections.add(detection_index)
@@ -522,9 +568,14 @@ class PersonTracker:
                 "center": self.center(box),
                 "confidence": detection["confidence"],
                 "missed": 0,
+                "hits": 1,
             }
 
             detection["track_id"] = track_id
+            detection["confirmed"] = self._is_confirmed(
+                1,
+                detection["confidence"],
+            )
 
         self._remove_old_tracks()
 
@@ -588,6 +639,14 @@ def detect_frame(model, frame, tracking=True):
 
     if tracking:
         sliced_detections = TRACKER.update(sliced_detections)
+        # Temporal confirmation: only report tracks observed on enough
+        # frames (or with strong confidence). One-frame flickers on
+        # debris/water are suppressed here, never faked into victims.
+        sliced_detections = [
+            detection
+            for detection in sliced_detections
+            if detection.get("confirmed", True)
+        ]
 
     return None, detections_to_api(sliced_detections)
 
@@ -799,7 +858,7 @@ def analyze_video(model, video_path):
         "success": True,
         "model": "YOLO26m",
         "mode": "recorded",
-        "detectionMethod": "2x2 sliced inference",
+        "detectionMethod": "3x3 sliced inference",
         "totalFrames": total_frames,
         "processedFrames": processed_frames,
         "victimsDetected": len(detected_ids),
@@ -817,12 +876,14 @@ def analyze_video(model, video_path):
 # ============================================================
 
 def live_stream(model, source):
+    """Stream person detections with a video-synchronized timeline."""
     print(
         f"[HAWKVISION] Opening live source: {source}",
         file=sys.stderr,
         flush=True,
     )
 
+    is_recorded_file = os.path.isfile(source)
     cap = cv2.VideoCapture(source)
 
     try:
@@ -833,57 +894,72 @@ def live_stream(model, source):
     if not cap.isOpened():
         emit({
             "type": "error",
-            "error": "Unable to connect to drone camera stream",
+            "error": "Unable to open drone video/stream",
             "source": source,
         })
         return
 
     reset_tracker()
 
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    if fps <= 1.0 or fps > 240.0:
+        fps = 30.0
+
+    frame_number = 0
+    last_processed_time = -LIVE_SAMPLE_INTERVAL
+    wall_start = time.monotonic()
+
     emit({
         "type": "connected",
         "mode": "live",
-        "source": "drone_camera",
-        "detectionMethod": "2x2 sliced inference",
+        "source": "recorded_video" if is_recorded_file else "drone_camera",
+        "detectionMethod": "3x3 sliced inference",
+        "fps": fps,
     })
-
-    frame_number = 0
 
     while True:
         success, frame = cap.read()
 
         if not success:
+            if is_recorded_file:
+                final_time = max(0.0, frame_number / fps)
+                emit({
+                    "type": "detection",
+                    "mode": "live",
+                    "frame": frame_number,
+                    "timestamp": final_time,
+                    "videoTime": final_time,
+                    "victims": [],
+                    "counts": {"total": 0, "high": 0, "medium": 0, "low": 0},
+                })
+                emit({"type": "complete", "mode": "recorded_video"})
+                break
+
             time.sleep(0.05)
             continue
 
         frame_number += 1
+        video_time = (frame_number - 1) / fps
+
+        # Recorded footage is sampled by VIDEO TIME, not wall-clock time.
+        if is_recorded_file and (video_time - last_processed_time) < LIVE_SAMPLE_INTERVAL:
+            continue
+
+        last_processed_time = video_time
 
         try:
-            _, detections = detect_frame(
-                model,
-                frame,
-                tracking=True,
-            )
+            _, detections = detect_frame(model, frame, tracking=True)
 
-            high = 0
-            medium = 0
-            low = 0
-
-            for detection in detections:
-                risk = detection["risk"]
-
-                if risk == "HIGH":
-                    high += 1
-                elif risk == "MEDIUM":
-                    medium += 1
-                else:
-                    low += 1
+            high = sum(1 for d in detections if d["risk"] == "HIGH")
+            medium = sum(1 for d in detections if d["risk"] == "MEDIUM")
+            low = sum(1 for d in detections if d["risk"] == "LOW")
 
             emit({
                 "type": "detection",
                 "mode": "live",
                 "frame": frame_number,
-                "timestamp": time.time(),
+                "timestamp": video_time if is_recorded_file else (time.monotonic() - wall_start),
+                "videoTime": video_time if is_recorded_file else None,
                 "victims": detections,
                 "counts": {
                     "total": len(detections),
@@ -894,18 +970,10 @@ def live_stream(model, source):
             })
 
         except Exception as error:
-            print(
-                f"[YOLO ERROR] {error}",
-                file=sys.stderr,
-                flush=True,
-            )
-
-            emit({
-                "type": "error",
-                "error": str(error),
-            })
-
-            time.sleep(0.05)
+            print(f"[YOLO ERROR] {error}", file=sys.stderr, flush=True)
+            emit({"type": "error", "error": str(error)})
+            if is_recorded_file:
+                time.sleep(0.05)
 
     cap.release()
 
