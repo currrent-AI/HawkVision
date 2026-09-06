@@ -2,6 +2,11 @@ const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
+// ============================================================
+// HAWKVISION VICTIM DETECTION
+// Render Backend → Colab T4 GPU → YOLO26m
+// ============================================================
+
 const PYTHON_PATH =
   process.env.PYTHON_PATH ||
   (process.platform === "win32" ? "python" : "python3");
@@ -13,10 +18,113 @@ const MODEL_PATH =
 
 const SCRIPT_PATH = path.join(__dirname, "victimDetection.py");
 
-const TIMEOUT_MS = 300000;
+// Local fallback timeout
+const LOCAL_TIMEOUT_MS = 300000;
+
+// Remote Colab timeout
+const REMOTE_TIMEOUT_MS = 300000;
+
+// ============================================================
+// REMOTE COLAB GPU DETECTION
+// ============================================================
+
+async function runColabDetection(imagePath) {
+  const colabUrl = process.env.COLAB_GPU_URL;
+
+  if (!colabUrl) {
+    throw new Error("COLAB_GPU_URL is not configured");
+  }
+
+  if (!fs.existsSync(imagePath)) {
+    throw new Error(`Image not found: ${imagePath}`);
+  }
+
+  const cleanBaseUrl = colabUrl.replace(/\/+$/, "");
+  const endpoint = `${cleanBaseUrl}/api/victims/detect`;
+
+  console.log("🚀 Using Colab T4 GPU for victim detection");
+  console.log("🔗 GPU endpoint:", endpoint);
+
+  const imageBuffer = await fs.promises.readFile(imagePath);
+
+  const filename = path.basename(imagePath);
+
+  const formData = new FormData();
+
+  formData.append(
+    "image",
+    new Blob([imageBuffer]),
+    filename
+  );
+
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, REMOTE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+
+    const responseText = await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      throw new Error(
+        `Colab returned invalid JSON. HTTP ${response.status}: ${
+          responseText.substring(0, 500) || "empty response"
+        }`
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          `Colab GPU detection failed with HTTP ${response.status}`
+      );
+    }
+
+    if (data?.success === false) {
+      throw new Error(
+        data?.error || "Colab victim detection failed"
+      );
+    }
+
+    console.log(
+      `✅ Colab GPU detection completed: ${
+        data?.totalVictims ?? 0
+      } victims`
+    );
+
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(
+        "Colab GPU victim detection timed out after 5 minutes"
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ============================================================
+// LOCAL PYTHON FALLBACK
+// ============================================================
 
 function runPythonDetection(imagePath) {
   return new Promise((resolve, reject) => {
+    console.log("🐍 Using local Python victim detection");
+
     const child = spawn(
       PYTHON_PATH,
       [
@@ -35,7 +143,7 @@ function runPythonDetection(imagePath) {
     const timeout = setTimeout(() => {
       child.kill();
       reject(new Error("Victim detection timed out"));
-    }, TIMEOUT_MS);
+    }, LOCAL_TIMEOUT_MS);
 
     child.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -99,6 +207,10 @@ function runPythonDetection(imagePath) {
   });
 }
 
+// ============================================================
+// MAIN DETECTION FUNCTION
+// ============================================================
+
 async function detectVictims(imagePath) {
   if (!imagePath || typeof imagePath !== "string") {
     throw new Error("Image path is required");
@@ -112,16 +224,28 @@ async function detectVictims(imagePath) {
     throw new Error(`Path is not a file: ${imagePath}`);
   }
 
-  // Validate Python script
-  if (!fs.existsSync(SCRIPT_PATH)) {
-    throw new Error(`Victim detection script not found: ${SCRIPT_PATH}`);
+  // ----------------------------------------------------------
+  // PRIMARY: COLAB T4 GPU
+  // ----------------------------------------------------------
+
+  if (process.env.COLAB_GPU_URL) {
+    return await runColabDetection(imagePath);
   }
 
-  // Validate YOLO model
+  // ----------------------------------------------------------
+  // FALLBACK: LOCAL PYTHON
+  // ----------------------------------------------------------
+
+  if (!fs.existsSync(SCRIPT_PATH)) {
+    throw new Error(
+      `Victim detection script not found: ${SCRIPT_PATH}`
+    );
+  }
+
   if (!fs.existsSync(MODEL_PATH)) {
     throw new Error(
       `Victim detection model not found: ${MODEL_PATH}. ` +
-      `Set VICTIM_MODEL_PATH in the Render environment variables.`
+        `Set VICTIM_MODEL_PATH in the Render environment variables.`
     );
   }
 
