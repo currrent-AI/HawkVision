@@ -32,10 +32,44 @@ const allowedOrigins = [
 
 console.log("Allowed CORS origins:", allowedOrigins);
 
+/*
+ * Explicit CORS headers.
+ * This makes production preflight requests reliable.
+ */
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    );
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    );
+  }
+
+  if (req.method === "OPTIONS") {
+    if (origin && allowedOrigins.includes(origin)) {
+      return res.sendStatus(204);
+    }
+
+    return res.sendStatus(403);
+  }
+
+  next();
+});
+
+/*
+ * CORS package for normal requests.
+ */
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an Origin header
+      // Allow requests without Origin header
       // (health checks / server-to-server requests)
       if (!origin) {
         return callback(null, true);
@@ -46,24 +80,15 @@ app.use(
       }
 
       console.log("CORS blocked origin:", origin);
-
-      // Don't crash the server for an unknown origin
-      return callback(null, false);
+      return callback(new Error("Not allowed by CORS"));
     },
-
     credentials: true,
-
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
-
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
       "Content-Type",
+      "Accept",
       "Authorization",
     ],
   })
@@ -139,13 +164,12 @@ app.use((req, res) => {
    GLOBAL ERROR HANDLER
    ========================================================= */
 
-app.use((error, req, res, next) => {
-  console.error("Global error:", error);
+app.use((err, req, res, next) => {
+  console.error("Global error:", err);
 
-  res.status(error.status || 500).json({
+  res.status(err.status || 500).json({
     success: false,
-    message:
-      error.message || "Internal server error",
+    message: err.message || "Internal server error",
   });
 });
 
